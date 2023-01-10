@@ -1,3 +1,3 @@
 # my-mini-vue
 
-## Study Vue3
+## Learn Vue3
