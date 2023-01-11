@@ -1,52 +1,91 @@
+import { extend } from "../shared"
+
+class ReactiveEffect {
+  private _fn: any
+  deps = [] // 所有的依赖
+  onStop?: () => void // stop 回调函数
+  active = true
+  constructor(fn, public scheduler?) {
+    this._fn = fn
+  }
+
+  run() {
+    activeEffect = this // 暂存实例，触发依赖或暂停相应时调用
+    return this._fn()
+  }
+
+  stop() {
+    if (this.active) {
+      cleanupEffect(this)
+
+      this.onStop && this.onStop()
+
+      this.active = false
+    }
+  }
+}
+
+function cleanupEffect(effect) {
+  effect.deps.forEach((dep: any) => {
+    dep.delete(effect)
+  })
+}
+
 // 收集依赖
 // target 容器
-const targetMap = new Map();
+const targetMap = new Map()
 export function track(target, key) {
-  let depsMap = targetMap.get(target);
+  let depsMap = targetMap.get(target)
   if (!depsMap) {
-    depsMap = new Map();
-    targetMap.set(target, depsMap);
+    depsMap = new Map()
+    targetMap.set(target, depsMap)
   }
 
   // key 容器
-  let dep = depsMap.get(key);
+  let dep = depsMap.get(key)
   if (!dep) {
-    dep = new Set();
-    depsMap.set(key, dep);
+    dep = new Set()
+    depsMap.set(key, dep)
   }
 
-  dep.add(activeEffect);
+  if (activeEffect) {
+    dep.add(activeEffect)
+    activeEffect.deps.push(dep)
+  }
 }
 
 // 触发依赖
 export function trigger(target, key) {
-  const depsMap = targetMap.get(target);
-  const dep = depsMap.get(key);
+  const depsMap = targetMap.get(target)
+  const dep = depsMap.get(key)
 
   for (const effect of dep) {
-    effect.run();
-  }
-}
-
-class ReactiveEffect {
-  private _fn: any;
-  constructor(fn) {
-    this._fn = fn;
-  }
-
-  run() {
-    activeEffect = this; // 暂存实例，触发依赖时调用 ↑
-    return this._fn();
+    if (effect.scheduler) {
+      effect.scheduler()
+    } else {
+      effect.run()
+    }
   }
 }
 
 // 全局变量存储 ReactiveEffect 实例对象，用于调用 fn
-let activeEffect;
-export function effect(fn) {
+let activeEffect
+export function effect(fn, options?: any) {
+  const { scheduler } = options || {}
   // 调用 fn
-  const _effect = new ReactiveEffect(fn);
+  const _effect = new ReactiveEffect(fn, scheduler)
 
-  _effect.run();
+  extend(_effect, options)
 
-  return _effect.run.bind(_effect);
+  _effect.run()
+
+  const runner: any = _effect.run.bind(_effect)
+  // 将实例对象暂存起来，便于后续使用 effect
+  runner.effect = _effect
+
+  return runner
+}
+
+export function stop(runner) {
+  runner.effect.stop()
 }
