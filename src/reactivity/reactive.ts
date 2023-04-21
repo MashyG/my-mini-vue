@@ -1,4 +1,4 @@
-import { track, trigger } from './effect'
+import { trackEffect, triggerEffect } from './effect'
 
 export function reactive(raw) {
   return new Proxy(raw, {
@@ -6,7 +6,7 @@ export function reactive(raw) {
       const res = Reflect.get(target, key)
 
       // 收集依赖
-      track(target, key)
+      trackEffect(target, key)
       return res
     },
 
@@ -14,7 +14,7 @@ export function reactive(raw) {
       const res = Reflect.set(target, key, value)
 
       // 触发依赖
-      trigger(target, key)
+      triggerEffect(target, key)
       return res
     }
   })

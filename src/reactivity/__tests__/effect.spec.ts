@@ -18,7 +18,6 @@ describe('effect', () => {
     expect(nextAge).toBe(20)
   })
 
-  // ???
   it('should return runner when call effect', () => {
     // effect (fn) -> return runner 函数 -> 执行函数 runner 后 再次执行 fn 并返回值
     let num = 18
@@ -33,8 +32,13 @@ describe('effect', () => {
     expect(res).toBe('num')
   })
 
-  // ???
-  it('scheduler', () => {
+  it('scheduler options', () => {
+    /**
+     * 1. 通过 effect 的第二个参数给定 scheduler 的函数
+     * 2. effect 第一次执行的时候，会执行 fn 函数
+     * 3. 当响应式对象 set 触发更新操作时，不会执行 fn 函数，而是执行 scheduler
+     * 4. 如果当执行 runner 函数时，会再次执行 fn 函数
+     */
     let dummy
     let run: any
     const scheduler = jest.fn(() => {

@@ -5,7 +5,7 @@ let activeEffect
 
 class ReactiveEffect {
   private _fn: any
-  deps = [] // 所有的依赖
+  deps = [] // 所有的依赖 dep
   onStop?: () => void // stop 回调函数
   active = true
   constructor(fn, public scheduler?) {
@@ -37,7 +37,8 @@ function cleanupEffect(effect) {
 // 收集依赖
 // target 容器
 const targetMap = new Map()
-export function track(target, key) {
+export function trackEffect(target, key) {
+  // target 容器
   let depsMap = targetMap.get(target)
   if (!depsMap) {
     depsMap = new Map()
@@ -53,12 +54,13 @@ export function track(target, key) {
 
   if (activeEffect) {
     dep.add(activeEffect)
+    // activeEffect.deps 用于之后清除 dep，所以暂存一下
     activeEffect.deps.push(dep)
   }
 }
 
 // 触发依赖
-export function trigger(target, key) {
+export function triggerEffect(target, key) {
   const depsMap = targetMap.get(target)
   const dep = depsMap.get(key)
 
@@ -80,6 +82,7 @@ export function effect(fn, options?: any) {
 
   _effect.run()
 
+  // 内部存在 this，所以需要绑定当前实例 _effect
   const runner: any = _effect.run.bind(_effect)
   // 将实例对象暂存起来，便于后续使用 effect
   runner.effect = _effect
