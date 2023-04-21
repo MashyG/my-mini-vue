@@ -1,4 +1,7 @@
-import { extend } from "../shared"
+import { extend } from '../shared'
+
+// 全局变量存储 ReactiveEffect 实例对象，用于调用 fn
+let activeEffect
 
 class ReactiveEffect {
   private _fn: any
@@ -68,8 +71,6 @@ export function trigger(target, key) {
   }
 }
 
-// 全局变量存储 ReactiveEffect 实例对象，用于调用 fn
-let activeEffect
 export function effect(fn, options?: any) {
   const { scheduler } = options || {}
   // 调用 fn

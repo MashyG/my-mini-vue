@@ -2,14 +2,15 @@ import { effect, stop } from '../effect'
 import { reactive } from '../reactive'
 
 describe('effect', () => {
-  it('happy path', () => {
+  it('核心流程', () => {
+    // 响应式对象
     const user = reactive({ age: 18 })
 
     let nextAge
     effect(() => {
       nextAge = user.age + 1
     })
-
+    // 初始化
     expect(nextAge).toBe(19)
 
     // 更新
