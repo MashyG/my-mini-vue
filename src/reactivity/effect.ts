@@ -4,7 +4,7 @@ import { extend } from '../shared'
 let activeEffect
 let shouldTack
 
-class ReactiveEffect {
+export class ReactiveEffect {
   private _fn: any
   deps = [] // 所有的依赖 dep
   onStop?: () => void // stop 回调函数
