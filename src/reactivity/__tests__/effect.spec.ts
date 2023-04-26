@@ -2,7 +2,7 @@ import { effect, stop } from '../effect'
 import { reactive } from '../reactive'
 
 describe('effect', () => {
-  it('核心流程', () => {
+  it('核心', () => {
     // 响应式对象
     const user = reactive({ age: 18 })
 
@@ -81,6 +81,8 @@ describe('effect', () => {
     // 暂停响应式的触发：清空所有收集的 effect
     stop(runner)
     obj.foo = 3
+    // obj.foo++ // <=> obj.foo = obj.foo + 1 => 单侧失败：先触发 get（此时，会把依赖清理掉），后触发 set（此时没有依赖）；
+    // 因此要在 run 方法做个判断，是否需要重新收集依赖
     // 修改obj.foo，但未触发 effect
     expect(dummy).toBe(2)
     // 重新执行 runner 后，effect 重新被收集起来

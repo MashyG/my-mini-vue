@@ -2,6 +2,7 @@ import { extend } from '../shared'
 
 // 全局变量存储 ReactiveEffect 实例对象，用于调用 fn
 let activeEffect
+let shouldTack
 
 class ReactiveEffect {
   private _fn: any
@@ -13,8 +14,15 @@ class ReactiveEffect {
   }
 
   run() {
+    if (!this.active) {
+      return this._fn()
+    }
+
+    shouldTack = true
     activeEffect = this // 暂存实例，触发依赖或暂停相应时调用
-    return this._fn()
+    const result = this._fn()
+    shouldTack = false
+    return result
   }
 
   stop() {
@@ -32,12 +40,15 @@ function cleanupEffect(effect) {
   effect.deps.forEach((dep: any) => {
     dep.delete(effect)
   })
+  effect.deps.length = 0
 }
 
 // 收集依赖
 // target 容器
 const targetMap = new Map()
-export function trackEffect(target, key) {
+export function track(target, key) {
+  if (!isTacking()) return
+
   // target 容器
   let depsMap = targetMap.get(target)
   if (!depsMap) {
@@ -51,19 +62,32 @@ export function trackEffect(target, key) {
     dep = new Set()
     depsMap.set(key, dep)
   }
+  trackEffects(dep)
+}
 
-  if (activeEffect) {
-    dep.add(activeEffect)
-    // activeEffect.deps 用于之后清除 dep，所以暂存一下
-    activeEffect.deps.push(dep)
+export function trackEffects(dep) {
+  // 看看 dep 之前有没有添加过，若有，则不添加了
+  if (dep.has(activeEffect)) {
+    return
   }
+  dep.add(activeEffect)
+  // activeEffect.deps 用于之后清除 dep 工作，所以暂存一下
+  activeEffect.deps.push(dep)
+}
+
+export function isTacking() {
+  return shouldTack && activeEffect !== undefined
 }
 
 // 触发依赖
-export function triggerEffect(target, key) {
+export function trigger(target, key) {
   const depsMap = targetMap.get(target)
   const dep = depsMap.get(key)
 
+  triggerEffects(dep)
+}
+
+export function triggerEffects(dep) {
   for (const effect of dep) {
     if (effect.scheduler) {
       effect.scheduler()
