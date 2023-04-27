@@ -1,4 +1,5 @@
 import { hasChanged, isObject } from '../shared'
+import { createDep } from './dep'
 import { isTacking, trackEffects, triggerEffects } from './effect'
 import { reactive } from './reactive'
 
@@ -11,7 +12,7 @@ class RefImpl {
     this._rawValue = value
     // 如果 value 是对象，则需要进行 reactive 处理
     this._value = convert(value)
-    this.dep = new Set()
+    this.dep = createDep()
   }
 
   get value() {
@@ -25,7 +26,7 @@ class RefImpl {
     if (hasChanged(newVal, this._rawValue)) {
       this._rawValue = newVal
       this._value = convert(newVal)
-      triggerEffects(this.dep)
+      triggerRefValue(this)
     }
   }
 }
@@ -34,7 +35,11 @@ function convert(value) {
   return isObject(value) ? reactive(value) : value
 }
 
-function trackRefValue(ref) {
+export function triggerRefValue(ref) {
+  triggerEffects(ref.dep)
+}
+
+export function trackRefValue(ref) {
   if (isTacking()) {
     trackEffects(ref.dep)
   }

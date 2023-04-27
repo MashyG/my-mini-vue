@@ -7,11 +7,14 @@ describe('computed', () => {
       foo: 1
     })
 
+    expect(value.foo).toBe(1)
     const getter = computed(() => {
       return value.foo
     })
 
-    expect(getter.value).toBe(1)
+    value.foo = 2
+    expect(value.foo).toBe(2)
+    expect(getter.value).toBe(2)
   })
 
   it('should compute lazily', () => {

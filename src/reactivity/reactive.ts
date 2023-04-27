@@ -14,7 +14,7 @@ const createReactiveObject = (raw, baseHandlers = mutableHandlers) => {
 }
 
 export function reactive(raw) {
-  return createReactiveObject(raw)
+  return createReactiveObject(raw, mutableHandlers)
 }
 
 export function readonly(raw) {

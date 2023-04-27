@@ -1,4 +1,5 @@
 import { extend } from '../shared'
+import { createDep } from './dep'
 
 // 全局变量存储 ReactiveEffect 实例对象，用于调用 fn
 let activeEffect
@@ -59,7 +60,7 @@ export function track(target, key) {
   // key 容器
   let dep = depsMap.get(key)
   if (!dep) {
-    dep = new Set()
+    dep = createDep()
     depsMap.set(key, dep)
   }
   trackEffects(dep)
@@ -67,12 +68,11 @@ export function track(target, key) {
 
 export function trackEffects(dep) {
   // 看看 dep 之前有没有添加过，若有，则不添加了
-  if (dep.has(activeEffect)) {
-    return
+  if (!dep.has(activeEffect)) {
+    dep.add(activeEffect)
+    // activeEffect.deps 用于之后清除 dep 工作，所以暂存一下
+    activeEffect.deps.push(dep)
   }
-  dep.add(activeEffect)
-  // activeEffect.deps 用于之后清除 dep 工作，所以暂存一下
-  activeEffect.deps.push(dep)
 }
 
 export function isTacking() {
@@ -82,6 +82,7 @@ export function isTacking() {
 // 触发依赖
 export function trigger(target, key) {
   const depsMap = targetMap.get(target)
+  if (!depsMap) return
   const dep = depsMap.get(key)
 
   triggerEffects(dep)
