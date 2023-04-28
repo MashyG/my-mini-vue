@@ -9,7 +9,16 @@ export const App = {
       'div',
       {
         id: 'hello',
-        class: 'hello-class'
+        class: 'hello-class',
+        onClick() {
+          console.log('onClick')
+        },
+        onMousedown() {
+          console.log('onmousedown')
+        },
+        onMouseup() {
+          console.log('onmouseup')
+        }
       },
       // string
       // `hi~ mashy-mini-vue`

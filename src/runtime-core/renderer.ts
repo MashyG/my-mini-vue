@@ -28,7 +28,6 @@ function processElement(vnode, container) {
 function mountElement(vnode, container) {
   console.log('processElement ----- vnode  >>>>', vnode)
   const { type, children, props, shapeFlags } = vnode || {}
-  // if (type) {
   const el = document.createElement(type)
   vnode.el = el
 
@@ -41,14 +40,17 @@ function mountElement(vnode, container) {
 
   // props
   for (const key in props) {
-    if (Object.prototype.hasOwnProperty.call(props, key)) {
-      const val = props[key]
+    const val = props[key]
+    const isEvent = (k: string) => /^on[A-Z]/.test(k)
+    if (isEvent(key)) {
+      const event = key.slice(2).toLocaleLowerCase()
+      el.addEventListener(event, val)
+    } else {
       el.setAttribute(key, val)
     }
   }
 
   container.append(el)
-  // }
 }
 
 function mountChildren(vnode, container) {
