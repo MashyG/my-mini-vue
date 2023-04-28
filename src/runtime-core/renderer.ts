@@ -1,4 +1,5 @@
 import { isObject } from '../shared/index'
+import { ShapeFlags } from '../shared/shapeFlags'
 import { createComponentInstance, setupComponent } from './component'
 
 export function render(vnode, rootContainer) {
@@ -11,10 +12,10 @@ function patch(vnode, container) {
   // TODO 处理 Element 类型
   //
   console.log(vnode)
-  const { type = '' } = vnode || {}
-  if (typeof type === 'string') {
+  const { type = '', shapeFlags } = vnode || {}
+  if (shapeFlags & ShapeFlags.ELEMENT) {
     processElement(vnode, container)
-  } else if (isObject(type)) {
+  } else if (shapeFlags & ShapeFlags.STATEFUL_COMPONENT) {
     processComponent(vnode, container)
   }
 }
@@ -26,17 +27,16 @@ function processElement(vnode, container) {
 
 function mountElement(vnode, container) {
   console.log('processElement ----- vnode  >>>>', vnode)
-  const { type, children, props } = vnode || {}
+  const { type, children, props, shapeFlags } = vnode || {}
   // if (type) {
   const el = document.createElement(type)
   vnode.el = el
 
   // children -> String, Array<vnode>
-  if (typeof children === 'string') {
+  if (shapeFlags & ShapeFlags.TEXT_CHILDREN) {
     el.textContent = children
-  } else if (Array.isArray(children)) {
-    // vnode
-    mountChildrenElement(children, el)
+  } else if (shapeFlags & ShapeFlags.ARRAY_CHILDREN) {
+    mountChildren(vnode, el)
   }
 
   // props
@@ -51,8 +51,8 @@ function mountElement(vnode, container) {
   // }
 }
 
-function mountChildrenElement(children, container) {
-  children.forEach((v) => {
+function mountChildren(vnode, container) {
+  vnode?.children?.forEach((v) => {
     patch(v, container)
   })
 }
