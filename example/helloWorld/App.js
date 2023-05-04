@@ -1,4 +1,4 @@
-import { h } from '../../dist/mashy-mini-vue.esm.js'
+import { createTextVNode, h } from '../../dist/mashy-mini-vue.esm.js'
 import { Emit } from './Emit.js'
 import { Foo } from './Foo.js'
 import { Slots } from './Slots.js'
@@ -15,17 +15,20 @@ export const App = {
     window.self = this
     // ui
     // slot 逐步演变
-    // const slotComps = [h('span', {}, 'slot -'), h('span', {}, 'test')]
-    // const slotComps = h('span', {}, 'slot - test')
+    // const slotComps = [h('p', {}, 'slot -'), h('p', {}, 'test')]
+    // const slotComps = h('p', {}, 'slot - test')
     // 具名插槽
     // const slotComps = {
-    //   header: [h('span', {}, 'slot - header')],
-    //   footer: h('span', {}, 'slot - footer')
+    //   header: [h('p', {}, 'slot - header')],
+    //   footer: h('p', {}, 'slot - footer')
     // }
     // 作用域插槽
     const slotComps = {
-      header: ({ age }) => h('span', {}, 'slot - header - ' + age),
-      footer: () => h('span', {}, 'slot - footer')
+      header: ({ age }) => [
+        h('p', {}, 'slot - header - ' + age),
+        createTextVNode('纯文字哟~~')
+      ],
+      footer: () => h('p', {}, 'slot - footer')
     }
     return h(
       'div',

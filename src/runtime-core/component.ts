@@ -20,7 +20,6 @@ export function createComponentInstance(vnode) {
 }
 
 export function setupComponent(instance) {
-  // TODO initProps， initSlots
   const { vnode } = instance || {}
   const { props, children } = vnode || {}
   initProps(instance, props)

@@ -1,6 +1,7 @@
 import { isObject } from '../shared/index'
 import { ShapeFlags } from '../shared/shapeFlags'
 import { createComponentInstance, setupComponent } from './component'
+import { Fragment, Text } from './vnode'
 
 export function render(vnode, rootContainer) {
   // patch
@@ -9,15 +10,37 @@ export function render(vnode, rootContainer) {
 
 function patch(vnode, container) {
   console.log('patch ----- vnode  >>>>', vnode)
-  // TODO 处理 Element 类型
-  //
-  console.log(vnode)
   const { type = '', shapeFlags } = vnode || {}
-  if (shapeFlags & ShapeFlags.ELEMENT) {
-    processElement(vnode, container)
-  } else if (shapeFlags & ShapeFlags.STATEFUL_COMPONENT) {
-    processComponent(vnode, container)
+
+  switch (type) {
+    case Fragment:
+      processFragment(vnode, container)
+      break
+
+    case Text:
+      processText(vnode, container)
+      break
+
+    default:
+      if (shapeFlags & ShapeFlags.ELEMENT) {
+        processElement(vnode, container)
+      } else if (shapeFlags & ShapeFlags.STATEFUL_COMPONENT) {
+        processComponent(vnode, container)
+      }
+      break
   }
+}
+
+// 处理 Fragment 节点
+function processFragment(vnode, container) {
+  mountChildren(vnode, container)
+}
+
+// 处理 Text 节点
+function processText(vnode, container) {
+  const { children } = vnode || {}
+  const textVNode = (vnode.el = document.createTextNode(children))
+  container.append(textVNode)
 }
 
 // 处理 Element 类型
