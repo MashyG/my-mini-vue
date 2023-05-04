@@ -1,6 +1,7 @@
 import { h } from '../../dist/mashy-mini-vue.esm.js'
 import { Emit } from './Emit.js'
 import { Foo } from './Foo.js'
+import { Slots } from './Slots.js'
 
 export const App = {
   name: 'APP',
@@ -13,6 +14,19 @@ export const App = {
     // 用于测试通过 this 获取 $el
     window.self = this
     // ui
+    // slot 逐步演变
+    // const slotComps = [h('span', {}, 'slot -'), h('span', {}, 'test')]
+    // const slotComps = h('span', {}, 'slot - test')
+    // 具名插槽
+    // const slotComps = {
+    //   header: [h('span', {}, 'slot - header')],
+    //   footer: h('span', {}, 'slot - footer')
+    // }
+    // 作用域插槽
+    const slotComps = {
+      header: ({ age }) => h('span', {}, 'slot - header - ' + age),
+      footer: () => h('span', {}, 'slot - footer')
+    }
     return h(
       'div',
       {
@@ -37,8 +51,8 @@ export const App = {
 
       // Array
       [
-        (h('p', { style: 'color: red;' }, `hi~ ${this.msg}`),
-        h('p', { style: 'color: blue;' }, 'mashy-mini-vue')),
+        h('p', { style: 'color: red;' }, `hi~ ${this.msg}`),
+        h('p', { style: 'color: blue;' }, 'mashy-mini-vue'),
         h(Foo, { count: this.count }),
         h(Emit, {
           onAdd(...args) {
@@ -48,7 +62,8 @@ export const App = {
             console.log('App - emit function onAddEmit', args)
             // changeCount()
           }
-        })
+        }),
+        h(Slots, {}, slotComps)
       ]
     )
   },
