@@ -1,4 +1,5 @@
 import { h } from '../../dist/mashy-mini-vue.esm.js'
+import { Emit } from './Emit.js'
 import { Foo } from './Foo.js'
 
 export const App = {
@@ -33,7 +34,15 @@ export const App = {
       [
         (h('p', { style: 'color: red;' }, `hi~ ${this.msg}`),
         h('p', { style: 'color: blue;' }, 'mashy-mini-vue')),
-        h(Foo, { count: 1 })
+        h(Foo, { count: 1 }),
+        h(Emit, {
+          onAdd(...args) {
+            console.log('App - emit function onAdd', args)
+          },
+          onAddEmit(...args) {
+            console.log('App - emit function onAddEmit', args)
+          }
+        })
       ]
     )
   },
