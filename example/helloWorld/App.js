@@ -1,4 +1,9 @@
-import { createTextVNode, h } from '../../dist/mashy-mini-vue.esm.js'
+import {
+  createTextVNode,
+  getCurrentInstance,
+  h
+} from '../../dist/mashy-mini-vue.esm.js'
+import { CurrentInstance } from './CurrentInstance.js'
 import { Emit } from './Emit.js'
 import { Foo } from './Foo.js'
 import { Slots } from './Slots.js'
@@ -66,11 +71,14 @@ export const App = {
             // changeCount()
           }
         }),
-        h(Slots, {}, slotComps)
+        h(Slots, {}, slotComps),
+        h(CurrentInstance, {}, '')
       ]
     )
   },
   setup() {
+    const instance = getCurrentInstance()
+    console.log('当前组件实例对象 - App', instance)
     return {
       count: 1,
       msg: 'mashy-mini-vue！！！'
