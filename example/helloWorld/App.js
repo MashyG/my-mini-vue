@@ -7,6 +7,7 @@ import { CurrentInstance } from './CurrentInstance.js'
 import { Emit } from './Emit.js'
 import { Foo } from './Foo.js'
 import { Slots } from './Slots.js'
+import { Provider as ProviderInject } from './Provider-Inject.js'
 
 export const App = {
   name: 'APP',
@@ -72,7 +73,8 @@ export const App = {
           }
         }),
         h(Slots, {}, slotComps),
-        h(CurrentInstance, {}, '')
+        h(CurrentInstance, {}, ''),
+        h(ProviderInject, {}, '')
       ]
     )
   },
