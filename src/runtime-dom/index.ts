@@ -6,14 +6,18 @@ function createElement(type) {
   return document.createElement(type)
 }
 // patchProps
-function patchProps(el, key, val) {
+function patchProps(el, key, prevVal, nextVal) {
   console.log('patchProps ----->>>>')
   const isEvent = (k: string) => /^on[A-Z]/.test(k)
   if (isEvent(key)) {
     const event = key.slice(2).toLocaleLowerCase()
-    el.addEventListener(event, val)
+    el.addEventListener(event, nextVal)
   } else {
-    el.setAttribute(key, val)
+    if (nextVal === undefined || nextVal === null) {
+      el.removeAttribute(key)
+    } else {
+      el.setAttribute(key, nextVal)
+    }
   }
 }
 // insert
