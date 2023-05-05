@@ -17,9 +17,9 @@ function patchProps(el, key, val) {
   }
 }
 // insert
-function insert(el, container) {
+function insert(el, parent) {
   console.log('insert ----->>>>')
-  container.append(el)
+  parent.append(el)
 }
 
 const renderer: any = createRenderer({

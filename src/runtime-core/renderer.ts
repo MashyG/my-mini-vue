@@ -4,7 +4,11 @@ import { createAppApi } from './createApp'
 import { Fragment, Text } from './vnode'
 
 export function createRenderer(options) {
-  const { createElement, patchProps, insert } = options || {}
+  const {
+    createElement: hostCreateElement,
+    patchProps: hostPatchProps,
+    insert: hostInsert
+  } = options || {}
   function render(vnode, rootContainer) {
     // patch
     patch(vnode, rootContainer, null)
@@ -54,7 +58,7 @@ export function createRenderer(options) {
     console.log('processElement ----- vnode  >>>>', vnode)
     const { type, children, props, shapeFlags } = vnode || {}
     // createElement
-    const el = createElement(type)
+    const el = hostCreateElement(type)
     vnode.el = el
 
     // children -> String, Array<vnode>
@@ -68,10 +72,10 @@ export function createRenderer(options) {
     for (const key in props) {
       const val = props[key]
       // patchProps
-      patchProps(el, key, val)
+      hostPatchProps(el, key, val)
     }
     // insert
-    insert(el, container)
+    hostInsert(el, container)
   }
 
   function mountChildren(vnode, container, parent) {
