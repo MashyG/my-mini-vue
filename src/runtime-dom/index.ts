@@ -21,9 +21,11 @@ function patchProps(el, key, prevVal, nextVal) {
   }
 }
 // insert
-function insert(el, parent) {
+function insert(child, parent, anchor) {
   console.log('insert ----->>>>')
-  parent.append(el)
+  // parent.append(el)
+  // 将 child 添加到锚点 anchor 之前
+  parent.insertBefore(child, anchor || null)
 }
 
 function remove(child) {
