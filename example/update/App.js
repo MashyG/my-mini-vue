@@ -3,7 +3,6 @@ import { h, ref } from '../../dist/mashy-mini-vue.esm.js'
 export const App = {
   name: 'APP',
   render() {
-    console.log('this ======== ', this)
     return h(
       'div',
       {
@@ -13,26 +12,30 @@ export const App = {
       [
         h('p', { style: 'color: blue;' }, `count: ${this.count}`),
         h('button', { onClick: this.onAdd }, 'add'),
-        h(
-          'button',
-          { onClick: this.changeProps1 },
-          'changeProps - 值改变了 - 修改逻辑'
-        ),
-        h(
-          'button',
-          { onClick: this.changeProps2 },
-          'changeProps - 值改变了 undefined - 删除逻辑'
-        ),
-        h(
-          'button',
-          { onClick: this.changeProps3 },
-          'changeProps - key 在新的里面没有了 - 删除逻辑'
-        )
+
+        h('p', { style: 'color: blue;' }, '按钮效果看 Elements'),
+        h('div', {}, [
+          h(
+            'button',
+            { onClick: this.changeProps1 },
+            'changeProps - 值改变了 - 修改逻辑'
+          ),
+          h(
+            'button',
+            { onClick: this.changeProps2 },
+            'changeProps - 值改变了 undefined - 删除逻辑'
+          ),
+          h(
+            'button',
+            { onClick: this.changeProps3 },
+            'changeProps - key 在新的里面没有了 - 删除逻辑'
+          )
+        ])
       ]
     )
   },
   setup() {
-    const count = ref(0)
+    const count = ref(1)
     const onAdd = () => {
       count.value++
     }
@@ -45,12 +48,10 @@ export const App = {
       console.log('changeProps1---------------')
       props.value.foo = 'new-foo-1'
     }
-
     const changeProps2 = () => {
       console.log('changeProps2---------------')
       props.value.foo = undefined
     }
-
     const changeProps3 = () => {
       console.log('changeProps3---------------')
       props.value = {
