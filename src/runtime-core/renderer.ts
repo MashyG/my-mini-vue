@@ -223,7 +223,7 @@ export function createRenderer(options) {
         i++
       }
     } else {
-      // 中间对比
+      // 6,7 中间对比
       const s1 = i
       const s2 = i
 
@@ -366,6 +366,8 @@ export function createRenderer(options) {
     createApp: createAppApi(render)
   }
 }
+
+// 获取最长递增子序列
 function getSequence(arr) {
   const p = arr.slice()
   const result = [0]
