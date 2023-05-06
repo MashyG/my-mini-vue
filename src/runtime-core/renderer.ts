@@ -9,7 +9,9 @@ export function createRenderer(options) {
   const {
     createElement: hostCreateElement,
     patchProps: hostPatchProps,
-    insert: hostInsert
+    insert: hostInsert,
+    remove: hostRemove,
+    setElementText: hostSetElementText
   } = options || {}
   function render(vnode, rootContainer) {
     // patch
@@ -42,7 +44,7 @@ export function createRenderer(options) {
 
   // 处理 Fragment 节点
   function processFragment(n1, n2, container, parentComponent) {
-    mountChildren(n2, container, parentComponent)
+    mountChildren(n2.children, container, parentComponent)
   }
 
   // 处理 Text 节点
@@ -72,7 +74,7 @@ export function createRenderer(options) {
     if (shapeFlags & ShapeFlags.TEXT_CHILDREN) {
       el.textContent = children
     } else if (shapeFlags & ShapeFlags.ARRAY_CHILDREN) {
-      mountChildren(vnode, el, parentComponent)
+      mountChildren(children, el, parentComponent)
     }
 
     // props
@@ -85,8 +87,8 @@ export function createRenderer(options) {
     // insert
     hostInsert(el, container)
   }
-  function mountChildren(vnode, container, parentComponent) {
-    vnode?.children?.forEach((v) => {
+  function mountChildren(children, container, parentComponent) {
+    children?.forEach((v) => {
       patch(null, v, container, parentComponent)
     })
   }
@@ -99,7 +101,44 @@ export function createRenderer(options) {
 
     const el = (n2.el = n1.el)
 
+    patchChildren(n1, n2, el, parentComponent)
     patchProps(el, oldProps, newProps)
+  }
+  function patchChildren(n1, n2, container, parentComponent) {
+    const { shapeFlags: prevShapeFlags, children: prevChildren } = n1 || {}
+    const { shapeFlags: nextShapeFlags, children: nextChildren } = n2 || {}
+
+    if (nextShapeFlags & ShapeFlags.TEXT_CHILDREN) {
+      // 新节点为 Text
+      if (prevShapeFlags & ShapeFlags.ARRAY_CHILDREN) {
+        // 旧节点为 Array
+        // 1. 移除旧节点
+        unmountChildren(prevChildren)
+        hostSetElementText(container, nextChildren)
+      }
+      // 2. 插入新节点；
+      // 两节点不一致时，替换新节点
+      if (prevChildren !== nextChildren) {
+        hostSetElementText(container, nextChildren)
+      }
+    } else {
+      // 新节点为 Array
+      if (prevShapeFlags & ShapeFlags.TEXT_CHILDREN) {
+        // 旧节点为 Text
+        // 1. 移除旧节点
+        hostSetElementText(container, '')
+        // 2. 插入新节点；
+        mountChildren(nextChildren, container, parentComponent)
+      } else {
+        // 旧节点为 Array
+      }
+    }
+  }
+  function unmountChildren(children) {
+    ;(children || []).forEach((child) => {
+      const { el } = child || {}
+      hostRemove(el)
+    })
   }
   function patchProps(el, oldProps, newProps) {
     if (oldProps !== newProps) {
