@@ -696,9 +696,10 @@ function createRenderer(options) {
                 }
                 else {
                     // 通过遍历新节点
-                    for (let j = s2; j < e2; j++) {
-                        if (isSomeVNodeType(prevChild, c2[j]))
+                    for (let j = s2; j <= e2; j++) {
+                        if (isSomeVNodeType(prevChild, c2[j])) {
                             newIndex = j;
+                        }
                         break;
                     }
                 }

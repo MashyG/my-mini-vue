@@ -4,17 +4,17 @@ import { h, ref } from '../../dist/mashy-mini-vue.esm.js'
 // (a b) c
 // (a b) d e
 // i = 2, e1 = 2, e2 = 3
-const prevChildren = [
-  h('p', { key: 'A' }, 'A'),
-  h('p', { key: 'B' }, 'B'),
-  h('p', { key: 'C' }, 'C')
-]
-const nextChildren = [
-  h('p', { key: 'A' }, 'A'),
-  h('p', { key: 'B' }, 'B'),
-  h('p', { key: 'D' }, 'D'),
-  h('p', { key: 'E' }, 'E')
-]
+// const prevChildren = [
+//   h('p', { key: 'A' }, 'A'),
+//   h('p', { key: 'B' }, 'B'),
+//   h('p', { key: 'C' }, 'C')
+// ]
+// const nextChildren = [
+//   h('p', { key: 'A' }, 'A'),
+//   h('p', { key: 'B' }, 'B'),
+//   h('p', { key: 'D' }, 'D'),
+//   h('p', { key: 'E' }, 'E')
+// ]
 
 // 2. 右边侧的对比
 // a (b c)
@@ -199,6 +199,20 @@ const nextChildren = [
 //   h('p', { key: 'F' }, 'F'),
 //   h('p', { key: 'G' }, 'G')
 // ]
+
+// fix: C 节点应该是移动，不是新建而来
+const prevChildren = [
+  h('p', { key: 'A' }, 'A'),
+  h('p', {}, 'C'),
+  h('p', { key: 'B' }, 'B'),
+  h('p', { key: 'D' }, 'D')
+]
+const nextChildren = [
+  h('p', { key: 'A' }, 'A'),
+  h('p', { key: 'B' }, 'B'),
+  h('p', {}, 'C'),
+  h('p', { key: 'D' }, 'D')
+]
 
 export default {
   name: 'Array2Text',
