@@ -690,7 +690,7 @@ function createRenderer(options) {
                     continue;
                 }
                 let newIndex;
-                if (prevChild.key !== null) {
+                if (prevChild.key != null) {
                     // 通过映射表选取
                     newIndex = key2NewIndexMap.get(prevChild.key);
                 }
@@ -699,8 +699,8 @@ function createRenderer(options) {
                     for (let j = s2; j <= e2; j++) {
                         if (isSomeVNodeType(prevChild, c2[j])) {
                             newIndex = j;
+                            break;
                         }
-                        break;
                     }
                 }
                 // 是否存在旧节点
