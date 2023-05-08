@@ -644,6 +644,13 @@ function createRenderer(options) {
         // 3. 新的比旧的多 -> 创建
         if (i > e1) {
             if (i <= e2) {
+                // 如果是这种情况的话就说明 e2 也就是新节点的数量大于旧节点的数量
+                // 也就是说新增了 vnode
+                // 应该循环 c2
+                // 锚点的计算：新的节点有可能需要添加到尾部，也可能添加到头部，所以需要指定添加的问题
+                // 要添加的位置是当前的位置(e2 开始)+1
+                // 因为对于往左侧添加的话，应该获取到 c2 的第一个元素
+                // 所以我们需要从 e2 + 1 取到锚点的位置
                 const nextPos = e2 + 1;
                 const anchor = nextPos < l2 ? c2[nextPos].el : parentAnchor;
                 while (i <= e2) {
@@ -669,22 +676,29 @@ function createRenderer(options) {
             let patched = 0;
             // 新节点的映射表
             const key2NewIndexMap = new Map();
-            // 新节点于旧节点的映射表
-            const newIndex2OldIndexMap = new Array(toBePatched);
             // 是否需要移动
             let moved = false;
             let maxNewIndexSoFar = 0;
-            for (let i = 0; i < toBePatched; i++) {
-                newIndex2OldIndexMap[i] = 0;
-            }
+            // 先把 key 和 newIndex 绑定好，方便后续基于 key 找到 newIndex
+            // 时间复杂度是 O(1)
             // 遍历新节点，得出映射关系
             for (let i = s2; i <= e2; i++) {
                 const nextChild = c2[i] || {};
                 key2NewIndexMap.set(nextChild.key, i);
             }
-            // 遍历旧节点，判断 key，或者遍历新节点来判断是否存在于旧节点中
+            // 初始化 从新的index映射为老的index
+            // 创建数组的时候给定数组的长度，这个是性能最快的写法
+            // 新节点针对旧节点的映射表
+            const newIndex2OldIndexMap = new Array(toBePatched);
+            // 初始化为 0 , 后面处理的时候 如果发现是 0 的话，那么就说明新值在老的里面不存在
+            for (let i = 0; i < toBePatched; i++) {
+                newIndex2OldIndexMap[i] = 0;
+            }
+            // 遍历旧节点，判断 key 是否能找到 newIndex，或者遍历新节点来判断是否存在于旧节点中
             for (let i = s1; i <= e1; i++) {
                 const prevChild = c1[i] || {};
+                // 优化点
+                // 如果老的节点大于新节点的数量的话，那么这里在处理老节点的时候就直接删除即可
                 if (patched >= toBePatched) {
                     hostRemove(prevChild.el);
                     continue;
@@ -692,10 +706,12 @@ function createRenderer(options) {
                 let newIndex;
                 if (prevChild.key != null) {
                     // 通过映射表选取
+                    // 时间复杂度O(1)
                     newIndex = key2NewIndexMap.get(prevChild.key);
                 }
                 else {
                     // 通过遍历新节点
+                    // 时间复杂度O(n)
                     for (let j = s2; j <= e2; j++) {
                         if (isSomeVNodeType(prevChild, c2[j])) {
                             newIndex = j;
@@ -704,42 +720,67 @@ function createRenderer(options) {
                     }
                 }
                 // 是否存在旧节点
-                if (!newIndex) {
+                if (newIndex === undefined) {
                     // 不存在则删除
                     hostRemove(prevChild.el);
                 }
                 else {
-                    // 新节点大于等于已记录的节点时，不需要移动
+                    // 把新节点的索引和老的节点的索引建立映射关系
+                    // i + 1 是因为 i 有可能是0 (0 的话会被认为新节点在老的节点中不存在)
+                    newIndex2OldIndexMap[newIndex - s2] = i + 1;
+                    // 来确定中间的节点是不是需要移动
+                    // 新的 newIndex 如果一直是升序的话，那么就说明没有移动
+                    // 所以我们可以记录最后一个节点在新的里面的索引，然后看看是不是升序
+                    // 不是升序的话，我们就可以确定节点移动过了
                     if (newIndex >= maxNewIndexSoFar) {
                         maxNewIndexSoFar = newIndex;
                     }
                     else {
                         moved = true;
                     }
-                    newIndex2OldIndexMap[newIndex - s2] = i + 1;
                     patch(prevChild, c2[newIndex], container, parentComponent, null);
                     patched++;
                 }
             }
-            // 获取最长递增子序列
+            // 利用最长递增子序列来优化移动逻辑
+            // 因为元素是升序的话，那么这些元素就是不需要移动的
+            // 而我们就可以通过最长递增子序列来获取到升序的列表
+            // 在移动的时候我们去对比这个列表，如果对比上的话，就说明当前元素不需要移动
+            // 通过 moved 来进行优化，如果没有移动过的话 那么就不需要执行算法
+            // getSequence 返回的是 newIndexToOldIndexMap 的索引值
+            // 所以后面我们可以直接遍历索引值来处理，也就是直接使用 toBePatched 即可
             const increasingNewIndexSequence = moved
                 ? getSequence(newIndex2OldIndexMap)
                 : [];
             let j = increasingNewIndexSequence.length - 1;
             // 倒序遍历，从后面开始插入，因为后面的节点已确定
+            // 遍历新节点
+            // 1. 需要找出老节点没有，而新节点有的 -> 需要把这个节点创建
+            // 2. 最后需要移动一下位置，比如 [c,d,e] -> [e,c,d]
+            // 这里倒循环是因为在 insert 的时候，需要保证锚点是处理完的节点（也就是已经确定位置了）
+            // 因为 insert 逻辑是使用的 insertBefore()
             for (let i = toBePatched - 1; i >= 0; i--) {
+                // 确定当前要处理的节点索引
                 const nextIndex = i + s2;
                 const nextChild = c2[nextIndex];
+                // 锚点等于当前节点索引+1
+                // 也就是当前节点的后面一个节点(又因为是倒遍历，所以锚点是位置确定的节点)
                 const nextPos = nextIndex + 1;
                 const anchor = nextPos < l2 ? c2[nextPos].el : null;
                 if (newIndex2OldIndexMap[i] === 0) {
+                    // 说明新节点在老的里面不存在，需要创建
                     patch(null, nextChild, container, parentComponent, anchor);
                 }
                 else if (moved) {
-                    if (j < 0 || i !== increasingNewIndexSequence[i]) {
+                    // 需要移动
+                    // 1. j 已经没有了 说明剩下的都需要移动了
+                    // 2. 最长子序列里面的值和当前的值匹配不上， 说明当前元素需要移动
+                    if (j < 0 || i !== increasingNewIndexSequence[j]) {
                         hostInsert(nextChild.el, container, anchor);
                     }
                     else {
+                        // 这里就是命中了  index 和 最长递增子序列的值
+                        // 所以可以移动指针了
                         j--;
                     }
                 }
