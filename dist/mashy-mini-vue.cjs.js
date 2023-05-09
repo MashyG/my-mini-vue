@@ -726,6 +726,7 @@ function createRenderer(options) {
                 }
                 else {
                     // 把新节点的索引和老的节点的索引建立映射关系
+                    // { 新节点索引: 旧节点索引 }
                     // i + 1 是因为 i 有可能是0 (0 的话会被认为新节点在老的节点中不存在)
                     newIndex2OldIndexMap[newIndex - s2] = i + 1;
                     // 来确定中间的节点是不是需要移动
