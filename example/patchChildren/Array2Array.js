@@ -177,7 +177,7 @@ import { h, ref } from '../../dist/mashy-mini-vue.esm.js'
 
 // 综合例子
 // a,b,(c,d,e,z),f,g
-// a,b,(d,c,y,e),f,g
+// a,b,(d,c,y,e,i),f,g
 // 最长子序列： [1,3]
 const prevChildren = [
   h('p', { key: 'A' }, 'A'),

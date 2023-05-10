@@ -12,6 +12,8 @@ export function createComponentInstance(vnode, parent) {
     setupState: {},
     props: {},
     slots: {},
+    next: null, // 需要更新的 vnode，用于更新 component 类型的组件
+    update: null,
     provides: parent ? parent.provides : {},
     parent,
     isMounted: false,

@@ -14,6 +14,7 @@ function createVNode(type, props, children) {
         type,
         props,
         children,
+        component: null,
         key: props && props.key,
         el: null,
         shapeFlags: getShapeFlag(type)
@@ -327,7 +328,8 @@ function initProps(instance, rawProps) {
 
 const publicPropertiesMap = {
     $el: (i) => i.vnode.el,
-    $slots: (i) => i.slots
+    $slots: (i) => i.slots,
+    $props: (i) => i.props
 };
 const publicInstanceProxyHandlers = {
     get({ _: instance }, key) {
@@ -369,6 +371,8 @@ function createComponentInstance(vnode, parent) {
         setupState: {},
         props: {},
         slots: {},
+        next: null,
+        update: null,
         provides: parent ? parent.provides : {},
         parent,
         isMounted: false,
@@ -468,6 +472,17 @@ function createAppApi(render) {
             }
         };
     };
+}
+
+function shouldUpdateComponent(prevVNode, nextVNode) {
+    const { props: prevProps } = prevVNode || {};
+    const { props: nextProps } = nextVNode || {};
+    for (const key in nextProps) {
+        if (nextProps[key] !== prevProps[key]) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function createRenderer(options) {
@@ -795,20 +810,48 @@ function createRenderer(options) {
     // 处理组件类型
     function processComponent(n1, n2, container, parentComponent, anchor) {
         console.log('processComponent ----- n2  >>>>', n2);
-        mountComponent(n2, container, parentComponent, anchor);
+        if (!n1) {
+            mountComponent(n2, container, parentComponent, anchor);
+        }
+        else {
+            updateComponent(n1, n2);
+        }
     }
     // 挂载组件
     function mountComponent(initialVNode, container, parentComponent, anchor) {
-        const instance = createComponentInstance(initialVNode, parentComponent);
+        // 存储 component，供后续更新组件使用
+        const instance = (initialVNode.component = createComponentInstance(initialVNode, parentComponent));
         console.log('mountComponent ----- instance 111 >>>>', instance);
         setupComponent(instance);
         console.log('mountComponent ----- instance 222 >>>>', instance);
         setupRenderEffect(instance, initialVNode, container, anchor);
     }
+    // 更新组件
+    function updateComponent(n1, n2) {
+        const instance = (n2.component = n1.component);
+        console.log('updateComponent ----- instance >>>>', instance);
+        // 判断是否需要更新组件
+        if (shouldUpdateComponent(n1, n2)) {
+            // 暂存下次需要更新的 vnode
+            instance.next = n2;
+            // 这里的 update 是在 setupRenderEffect 里面初始化的，update 函数除了当内部的响应式对象发生改变的时候会调用
+            // 还可以直接主动的调用(这是属于 effect 的特性)
+            // 调用 update 再次更新调用 patch 逻辑
+            // 在update 中调用的 next 就变成了 n2了
+            // ps：可以详细的看看 update 中 next 的应用
+            instance.update();
+        }
+        else {
+            // 不需要更新的话，那么只需要覆盖下面的属性即可
+            n2.el = n1.el;
+            instance.vnode = n2;
+        }
+    }
     // 调用 render，进行拆箱操作
     function setupRenderEffect(instance, initialVNode, container, anchor) {
-        effect(() => {
-            const { proxy, isMounted } = instance || {};
+        // effect 返回的 runner 供后续更新组件使用
+        instance.update = effect(() => {
+            const { proxy, isMounted, next, vnode } = instance || {};
             if (!isMounted) {
                 // subTree -> initialVNode
                 const subTree = (instance.subTree = instance.render.call(proxy));
@@ -821,6 +864,11 @@ function createRenderer(options) {
                 instance.isMounted = true;
             }
             else {
+                // 需要一个待更新的 vnode
+                if (next) {
+                    next.el = vnode.el;
+                    updateComponentPreRender(instance, next);
+                }
                 const subTree = instance.render.call(proxy);
                 const prevSubTree = instance.subTree;
                 console.log('setupRenderEffect ----- update prevSubTree subTree  >>>>', prevSubTree, subTree);
@@ -832,6 +880,12 @@ function createRenderer(options) {
     return {
         createApp: createAppApi(render)
     };
+}
+function updateComponentPreRender(instance, nextVNode) {
+    instance.vnode = nextVNode;
+    instance.next = null;
+    // props 简单实现赋值
+    instance.props = nextVNode.props;
 }
 // 获取最长递增子序列
 function getSequence(arr) {
@@ -878,12 +932,12 @@ function getSequence(arr) {
 
 // createElement
 function createElement(type) {
-    console.log('createElement ----->>>>');
+    console.log('createElement ----->>>> type ', type);
     return document.createElement(type);
 }
 // patchProps
 function patchProps(el, key, prevVal, nextVal) {
-    console.log('patchProps ----->>>>');
+    console.log('patchProps ----->>>> el, key, nextVal', el, key, nextVal);
     const isEvent = (k) => /^on[A-Z]/.test(k);
     if (isEvent(key)) {
         const event = key.slice(2).toLocaleLowerCase();
@@ -900,12 +954,13 @@ function patchProps(el, key, prevVal, nextVal) {
 }
 // insert
 function insert(child, parent, anchor) {
-    console.log('insert ----->>>>');
+    console.log('insert ----->>>> child, parent', child, parent);
     // parent.append(el)
     // 将 child 添加到锚点 anchor 之前
     parent.insertBefore(child, anchor || null);
 }
 function remove(child) {
+    console.log('remove ----->>>> child', child);
     const { parentNode } = child || {};
     if (parentNode) {
         parentNode.removeChild(child);

@@ -3,6 +3,7 @@ import { EMPTY_OBJECT } from '../shared'
 import { ShapeFlags } from '../shared/shapeFlags'
 import { createComponentInstance, setupComponent } from './component'
 import { createAppApi } from './createApp'
+import { shouldUpdateComponent } from './updateComponentUtils'
 import { Fragment, Text } from './vnode'
 
 export function createRenderer(options) {
@@ -365,12 +366,20 @@ export function createRenderer(options) {
   // 处理组件类型
   function processComponent(n1, n2, container, parentComponent, anchor) {
     console.log('processComponent ----- n2  >>>>', n2)
-    mountComponent(n2, container, parentComponent, anchor)
+    if (!n1) {
+      mountComponent(n2, container, parentComponent, anchor)
+    } else {
+      updateComponent(n1, n2)
+    }
   }
 
   // 挂载组件
   function mountComponent(initialVNode, container, parentComponent, anchor) {
-    const instance = createComponentInstance(initialVNode, parentComponent)
+    // 存储 component，供后续更新组件使用
+    const instance = (initialVNode.component = createComponentInstance(
+      initialVNode,
+      parentComponent
+    ))
     console.log('mountComponent ----- instance 111 >>>>', instance)
 
     setupComponent(instance)
@@ -379,10 +388,32 @@ export function createRenderer(options) {
     setupRenderEffect(instance, initialVNode, container, anchor)
   }
 
+  // 更新组件
+  function updateComponent(n1, n2) {
+    const instance = (n2.component = n1.component)
+    console.log('updateComponent ----- instance >>>>', instance)
+    // 判断是否需要更新组件
+    if (shouldUpdateComponent(n1, n2)) {
+      // 暂存下次需要更新的 vnode
+      instance.next = n2
+      // 这里的 update 是在 setupRenderEffect 里面初始化的，update 函数除了当内部的响应式对象发生改变的时候会调用
+      // 还可以直接主动的调用(这是属于 effect 的特性)
+      // 调用 update 再次更新调用 patch 逻辑
+      // 在update 中调用的 next 就变成了 n2了
+      // ps：可以详细的看看 update 中 next 的应用
+      instance.update()
+    } else {
+      // 不需要更新的话，那么只需要覆盖下面的属性即可
+      n2.el = n1.el
+      instance.vnode = n2
+    }
+  }
+
   // 调用 render，进行拆箱操作
   function setupRenderEffect(instance, initialVNode, container, anchor) {
-    effect(() => {
-      const { proxy, isMounted } = instance || {}
+    // effect 返回的 runner 供后续更新组件使用
+    instance.update = effect(() => {
+      const { proxy, isMounted, next, vnode } = instance || {}
       if (!isMounted) {
         // subTree -> initialVNode
         const subTree = (instance.subTree = instance.render.call(proxy))
@@ -395,6 +426,11 @@ export function createRenderer(options) {
         initialVNode.el = subTree.el
         instance.isMounted = true
       } else {
+        // 需要一个待更新的 vnode
+        if (next) {
+          next.el = vnode.el
+          updateComponentPreRender(instance, next)
+        }
         const subTree = instance.render.call(proxy)
         const prevSubTree = instance.subTree
         console.log(
@@ -412,6 +448,13 @@ export function createRenderer(options) {
   return {
     createApp: createAppApi(render)
   }
+}
+
+function updateComponentPreRender(instance, nextVNode) {
+  instance.vnode = nextVNode
+  instance.next = null
+  // props 简单实现赋值
+  instance.props = nextVNode.props
 }
 
 // 获取最长递增子序列
