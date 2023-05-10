@@ -3,6 +3,7 @@ import { EMPTY_OBJECT } from '../shared'
 import { ShapeFlags } from '../shared/shapeFlags'
 import { createComponentInstance, setupComponent } from './component'
 import { createAppApi } from './createApp'
+import { queueJobs } from './scheduler'
 import { shouldUpdateComponent } from './updateComponentUtils'
 import { Fragment, Text } from './vnode'
 
@@ -412,37 +413,46 @@ export function createRenderer(options) {
   // 调用 render，进行拆箱操作
   function setupRenderEffect(instance, initialVNode, container, anchor) {
     // effect 返回的 runner 供后续更新组件使用
-    instance.update = effect(() => {
-      const { proxy, isMounted, next, vnode } = instance || {}
-      if (!isMounted) {
-        // subTree -> initialVNode
-        const subTree = (instance.subTree = instance.render.call(proxy))
-        console.log('setupRenderEffect ----- init subTree  >>>>', subTree)
-        // initialVNode -> patch
-        // initialVNode -> element 类型 -> mountElement 渲染
-        patch(null, subTree, container, instance, anchor)
+    instance.update = effect(
+      () => {
+        const { proxy, isMounted, next, vnode } = instance || {}
+        if (!isMounted) {
+          // subTree -> initialVNode
+          const subTree = (instance.subTree = instance.render.call(proxy))
+          console.log('setupRenderEffect ----- init subTree  >>>>', subTree)
+          // initialVNode -> patch
+          // initialVNode -> element 类型 -> mountElement 渲染
+          patch(null, subTree, container, instance, anchor)
 
-        // mount 完成之后才可以获取到虚拟 DOM 的el
-        initialVNode.el = subTree.el
-        instance.isMounted = true
-      } else {
-        // 需要一个待更新的 vnode
-        if (next) {
-          next.el = vnode.el
-          updateComponentPreRender(instance, next)
+          // mount 完成之后才可以获取到虚拟 DOM 的el
+          initialVNode.el = subTree.el
+          instance.isMounted = true
+        } else {
+          // 需要一个待更新的 vnode
+          if (next) {
+            next.el = vnode.el
+            updateComponentPreRender(instance, next)
+          }
+          const subTree = instance.render.call(proxy)
+          const prevSubTree = instance.subTree
+          console.log(
+            'setupRenderEffect ----- update prevSubTree subTree  >>>>',
+            prevSubTree,
+            subTree
+          )
+          instance.subTree = subTree
+
+          patch(prevSubTree, subTree, container, instance, anchor)
         }
-        const subTree = instance.render.call(proxy)
-        const prevSubTree = instance.subTree
-        console.log(
-          'setupRenderEffect ----- update prevSubTree subTree  >>>>',
-          prevSubTree,
-          subTree
-        )
-        instance.subTree = subTree
-
-        patch(prevSubTree, subTree, container, instance, anchor)
+      },
+      {
+        scheduler() {
+          console.log('update -  scheduler')
+          // 通过微任务控制组件的更新
+          queueJobs(instance.update)
+        }
       }
-    })
+    )
   }
 
   return {

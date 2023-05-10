@@ -474,6 +474,33 @@ function createAppApi(render) {
     };
 }
 
+const queue = [];
+const p = Promise.resolve();
+let isFlushPending = false;
+function nextTick(fn) {
+    return fn ? p.then(fn) : p;
+}
+function queueJobs(job) {
+    if (!queue.includes(job)) {
+        queue.push(job);
+    }
+    queueFlush();
+}
+function queueFlush() {
+    if (isFlushPending) {
+        return;
+    }
+    isFlushPending = true;
+    nextTick(flushJob);
+}
+function flushJob() {
+    let job;
+    isFlushPending = false;
+    while ((job = queue.shift())) {
+        job && job();
+    }
+}
+
 function shouldUpdateComponent(prevVNode, nextVNode) {
     const { props: prevProps } = prevVNode || {};
     const { props: nextProps } = nextVNode || {};
@@ -875,6 +902,12 @@ function createRenderer(options) {
                 instance.subTree = subTree;
                 patch(prevSubTree, subTree, container, instance, anchor);
             }
+        }, {
+            scheduler() {
+                console.log('update -  scheduler');
+                // 通过微任务控制组件的更新
+                queueJobs(instance.update);
+            }
         });
     }
     return {
@@ -980,4 +1013,4 @@ function createApp(...args) {
     return renderer.createApp(...args);
 }
 
-export { createApp, createRenderer, createTextVNode, getCurrentInstance, h, inject, provide, proxyRefs, ref, renderSlots };
+export { createApp, createRenderer, createTextVNode, getCurrentInstance, h, inject, nextTick, provide, proxyRefs, ref, renderSlots };
