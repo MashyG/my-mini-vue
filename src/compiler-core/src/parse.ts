@@ -14,6 +14,10 @@ enum TagTypes {
   END,
 }
 
+function startsWith(source: string, searchString: string): boolean {
+  return source.startsWith(searchString);
+}
+
 export function baseParse(content: string): any {
   const context = createParseContext(content);
   return createRoot(parseChildren(context, []));
@@ -26,7 +30,7 @@ function parseChildren(context: ParseContext, ancestor: TagElementType[]) {
   while (!isEnd(context, ancestor)) {
     let node;
     const s = context.source || "";
-    if (s.startsWith("{{")) {
+    if (startsWith(s, "{{")) {
       // 插值
       node = parseInterpolation(context);
     } else if (s[0] === "<") {
@@ -63,7 +67,7 @@ function isEnd(context: ParseContext, ancestor: TagElementType[]) {
   // console.log('isEnd --- source', s)
   // console.log('isEnd --- ancestor', ancestor)
   // 遇到结束标签时，例如：</div>
-  if (s.startsWith(`</`)) {
+  if (startsWith(s, "</")) {
     for (let i = ancestor.length - 1; i >= 0; --i) {
       if (startsWithEndTagOpen(s, ancestor[i].tag)) {
         return true;
@@ -176,7 +180,7 @@ function parseTextData(context: ParseContext, length: number) {
 
 function startsWithEndTagOpen(source: string, tag: string) {
   return (
-    source.startsWith("</") &&
+    startsWith(source, "</") &&
     source.slice(2, 2 + tag.length).toLocaleLowerCase() ===
       tag.toLocaleLowerCase()
   );
