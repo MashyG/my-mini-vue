@@ -2,11 +2,11 @@
   "name": "mini-vue",
   "version": "0.0.1",
   "description": "learn mini-vue",
-  "main": "index.js",
-  "type": "module",
+  "main": "dist/mashy-mini-vue.cjs.js",
+  "module": "dist/mashy-mini-vue.esm.js",
   "scripts": {
     "test": "jest",
-    "build": "rollup -c rollup.config.js --watch"
+    "build": "rollup -c rollup.config.js --bundleConfigAsCjs --watch"
   },
   "keywords": [
     "mini-vue"

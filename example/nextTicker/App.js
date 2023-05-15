@@ -9,7 +9,7 @@ export const App = {
   name: 'APP',
   render() {
     return h('div', {}, [
-      h('p', { style: 'color: blue;' }, '按钮效果看 Elements'),
+      h('p', { style: 'color: blue;' }, 'Click 按钮'),
       h('button', { onClick: this.onClick }, 'update count'),
       h('p', {}, `count ===>>>> ${this.count}`)
     ])
