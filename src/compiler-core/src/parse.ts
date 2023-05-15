@@ -11,32 +11,61 @@ enum TagTypes {
 
 export function baseParse(content: string): any {
   const context = createParseContext(content)
-  return createRoot(parseChildren(context))
+  return createRoot(parseChildren(context, []))
 }
 
-function parseChildren(context: ParseContext) {
+function parseChildren(context: ParseContext, ancestor: any[]) {
   const nodes: any = []
 
-  const s = context.source || ''
-  let node
-  if (s.startsWith('{{')) {
-    // 插值
-    node = parseInterpolation(context)
-  } else if (s[0] === '<') {
-    // element
-    if (/[a-z]/.test(s[1])) {
-      node = parseElement(context)
+  while (!isEnd(context, ancestor)) {
+    let node
+    const s = context.source || ''
+    if (s.startsWith('{{')) {
+      // 插值
+      node = parseInterpolation(context)
+    } else if (s[0] === '<') {
+      // element
+      if (s[1] === '/') {
+        // 这里属于 edge case 可以不用关心
+        // 处理结束标签
+        if (/[a-z]/i.test(s[2])) {
+          // 匹配 </div>
+          // 需要改变 context.source 的值 -> 也就是需要移动光标
+          parseTag(context, TagTypes.END)
+          // 结束标签就以为这都已经处理完了，所以就可以跳出本次循环了
+          continue
+        }
+      } else if (/[a-z]/.test(s[1])) {
+        node = parseElement(context, ancestor)
+      }
     }
-  }
 
-  // text 作为默认解析
-  if (!node) {
-    node = parseText(context)
-  }
+    // text 作为默认解析
+    if (!node) {
+      node = parseText(context)
+    }
 
-  nodes.push(node)
+    nodes.push(node)
+  }
 
   return nodes
+}
+
+// 判断是否结束
+function isEnd(context: ParseContext, ancestor: any[]) {
+  const s = context.source
+  // console.log('isEnd --- source', s)
+  // console.log('isEnd --- ancestor', ancestor)
+  // 遇到结束标签时，例如：</div>
+  if (s.startsWith(`</`)) {
+    for (let i = ancestor.length - 1; i >= 0; --i) {
+      if (startsWithEndTagOpen(s, ancestor[i].tag)) {
+        return true
+      }
+    }
+  }
+  // source 没有值时
+  return !s
 }
 
 // 解析插值表达式
@@ -71,11 +100,22 @@ function parseInterpolation(context: ParseContext) {
 }
 
 // 解析 Element
-function parseElement(context: ParseContext) {
+function parseElement(context: ParseContext, ancestor: any[]) {
   // 1. 解析 Tag
-  const element = parseTag(context, TagTypes.START)
+  const element: any = parseTag(context, TagTypes.START)
+  // 收集已解析到的 element 标签
+  ancestor.push(element)
 
-  parseTag(context, TagTypes.END)
+  element.children = parseChildren(context, ancestor)
+  // 移除对应的 element 标签
+  ancestor.pop()
+
+  console.log('element ---- ', element)
+  if (startsWithEndTagOpen(context.source, element.tag)) {
+    parseTag(context, TagTypes.END)
+  } else {
+    throw new Error(`缺少结束标签：${element.tag}`)
+  }
 
   return element
 }
@@ -101,17 +141,35 @@ function parseTag(context: ParseContext, type: TagTypes) {
 
 // 默认解析 Text
 function parseText(context: ParseContext) {
-  const content = parseTextData(context, context.source.length)
+  let endIndex = context.source.length
+  const endTokens = ['<', '{{']
 
-  console.log('context.source', context.source)
+  for (let i = 0; i < endTokens.length; i++) {
+    const index = context.source.indexOf(endTokens[i])
+    if (index !== -1 && endIndex > index) {
+      endIndex = index
+    }
+  }
+
+  const content = parseTextData(context, endIndex)
+
+  console.log('parseText --- context.source', context.source)
 
   return { type: NodeTypes.TEXT, content }
 }
 
 function parseTextData(context: ParseContext, length: number) {
-  const content = context.source.slice(0, length)
-  advanceBy(context, content.length)
-  return content
+  const rawText = context.source.slice(0, length)
+  advanceBy(context, length)
+  return rawText
+}
+
+function startsWithEndTagOpen(source: string, tag: string) {
+  return (
+    source.startsWith('</') &&
+    source.slice(2, 2 + tag.length).toLocaleLowerCase() ===
+      tag.toLocaleLowerCase()
+  )
 }
 
 function advanceBy(context: ParseContext, length: number) {
@@ -120,6 +178,7 @@ function advanceBy(context: ParseContext, length: number) {
 
 function createRoot(children) {
   return {
+    type: NodeTypes.ROOT,
     children
   }
 }

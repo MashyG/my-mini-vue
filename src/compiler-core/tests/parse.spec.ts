@@ -22,7 +22,8 @@ describe('parse', () => {
 
       expect(ast.children[0]).toStrictEqual({
         type: NodeTypes.ELEMENT,
-        tag: 'div'
+        tag: 'div',
+        children: []
       })
     })
   })
@@ -34,6 +35,76 @@ describe('parse', () => {
       expect(ast.children[0]).toStrictEqual({
         type: NodeTypes.TEXT,
         content: 'mashy'
+      })
+    })
+  })
+
+  describe('联合类型', () => {
+    it('联合类型 simple', () => {
+      const ast = baseParse('<p>mashy~{{message}}</p>')
+      expect(ast.children[0]).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        tag: 'p',
+        children: [
+          {
+            type: NodeTypes.TEXT,
+            content: 'mashy~'
+          },
+          {
+            type: NodeTypes.INTERPOLATION,
+            content: {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: 'message'
+            }
+          }
+        ]
+      })
+    })
+
+    it('联合类型 - 嵌套多个 Element', () => {
+      const ast = baseParse('<p><div>hi~</div>mashy~{{message}}</p>')
+      expect(ast.children[0]).toStrictEqual({
+        type: NodeTypes.ELEMENT,
+        tag: 'p',
+        children: [
+          {
+            type: NodeTypes.ELEMENT,
+            tag: 'div',
+            children: [
+              {
+                type: NodeTypes.TEXT,
+                content: 'hi~'
+              }
+            ]
+          },
+          {
+            type: NodeTypes.TEXT,
+            content: 'mashy~'
+          },
+          {
+            type: NodeTypes.INTERPOLATION,
+            content: {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: 'message'
+            }
+          }
+        ]
+      })
+    })
+
+    it('联合类型 - 缺少结束标签', () => {
+      expect(() => {
+        baseParse('<p><div></p>')
+      }).toThrow('缺少结束标签：div')
+    })
+
+    it.only('联合类型 - 缺少开始标签', () => {
+      const ast = baseParse('some text</div>')
+      const text = ast.children[0]
+
+      expect(text).toStrictEqual({
+        type: NodeTypes.TEXT,
+        content: 'some text'
       })
     })
   })
