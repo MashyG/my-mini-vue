@@ -3,6 +3,11 @@ import { NodeTypes } from './ast'
 interface ParseContext {
   source: string
 }
+interface TagElementType {
+  type: NodeTypes
+  tag: string
+  children: Array<TagElementType>
+}
 
 enum TagTypes {
   START,
@@ -14,7 +19,7 @@ export function baseParse(content: string): any {
   return createRoot(parseChildren(context, []))
 }
 
-function parseChildren(context: ParseContext, ancestor: any[]) {
+function parseChildren(context: ParseContext, ancestor: TagElementType[]) {
   const nodes: any = []
 
   while (!isEnd(context, ancestor)) {
@@ -52,7 +57,7 @@ function parseChildren(context: ParseContext, ancestor: any[]) {
 }
 
 // 判断是否结束
-function isEnd(context: ParseContext, ancestor: any[]) {
+function isEnd(context: ParseContext, ancestor: TagElementType[]) {
   const s = context.source
   // console.log('isEnd --- source', s)
   // console.log('isEnd --- ancestor', ancestor)
@@ -100,9 +105,10 @@ function parseInterpolation(context: ParseContext) {
 }
 
 // 解析 Element
-function parseElement(context: ParseContext, ancestor: any[]) {
+function parseElement(context: ParseContext, ancestor: TagElementType[]) {
   // 1. 解析 Tag
-  const element: any = parseTag(context, TagTypes.START)
+  const element: TagElementType =
+    parseTag(context, TagTypes.START) || ({} as any)
   // 收集已解析到的 element 标签
   ancestor.push(element)
 

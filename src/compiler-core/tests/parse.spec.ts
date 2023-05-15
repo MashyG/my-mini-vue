@@ -98,7 +98,7 @@ describe('parse', () => {
       }).toThrow('缺少结束标签：div')
     })
 
-    it.only('联合类型 - 缺少开始标签', () => {
+    it('联合类型 - 缺少开始标签', () => {
       const ast = baseParse('some text</div>')
       const text = ast.children[0]
 
