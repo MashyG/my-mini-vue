@@ -45,9 +45,9 @@ function traverseNode(node: any, context: TransformContext) {
   const { nodeTransforms } = context || {}
   for (let i = 0; i < nodeTransforms.length; i++) {
     const transformFunc: any = nodeTransforms[i]
-    transformFunc(node)
+    transformFunc(node, context)
   }
-  console.log('node', node)
+  // console.log('node', node)
 
   switch (node.type) {
     case NodeTypes.INTERPOLATION:

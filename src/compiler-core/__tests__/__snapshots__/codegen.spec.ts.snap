@@ -1,5 +1,12 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`codegen 实现 render element 标签 1`] = `
+"const { createElementVNode: _createElementVNode, toDisplayString: _toDisplayString } = Vue
+return function render(_ctx, _cache) {
+return _createElementVNode('div', null, 'hi~'_toDisplayString(mashy))
+}"
+`;
+
 exports[`codegen 实现 render interpolation 插值类型 1`] = `
 "const { toDisplayString: _toDisplayString } = Vue
 return function render(_ctx, _cache) {
@@ -10,6 +17,5 @@ return _toDisplayString(mashy)
 exports[`codegen 实现 render string 纯字符串 1`] = `
 "return function render(_ctx, _cache) {
 return 'mashy'
-
 }"
 `;

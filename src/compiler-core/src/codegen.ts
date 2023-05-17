@@ -1,5 +1,9 @@
 import { NodeTypes } from './ast'
-import { TO_DISPLAY_STRING, helperMapName } from './runtimeHelpers'
+import {
+  CREATE_ELEMENT_VNODE,
+  TO_DISPLAY_STRING,
+  helperMapName
+} from './runtimeHelpers'
 
 export function generate(ast) {
   console.log('ast === ', ast)
@@ -65,15 +69,20 @@ function genNode(node: any, context) {
     case NodeTypes.SIMPLE_EXPRESSION:
       genExpression(node, context)
       break
+    case NodeTypes.ELEMENT:
+      genElement(node, context)
+      break
     default:
       break
   }
 }
 
+// 纯字符串
 function genText(node, context) {
-  context.push(`'${node.content}'\n`)
+  context.push(`'${node.content}'`)
 }
 
+// 插值
 function genInterpolation(node, context) {
   const { push, helper } = context || {}
   push(`${helper(TO_DISPLAY_STRING)}(`)
@@ -81,6 +90,21 @@ function genInterpolation(node, context) {
   push(`)`)
 }
 
+// 表达式
 function genExpression(node, context) {
   context.push(`${node.content}`)
+}
+
+function genElement(node, context) {
+  const { push, helper } = context || {}
+  const { tag, children } = node || {}
+  console.log('genElement -- children', children)
+  push(`${helper(CREATE_ELEMENT_VNODE)}('${tag}', null, `)
+
+  for (let i = 0; i < children.length; i++) {
+    const element = children[i]
+    genNode(element, context)
+  }
+
+  push(')')
 }

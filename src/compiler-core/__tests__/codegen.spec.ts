@@ -1,6 +1,7 @@
 import { generate } from '../src/codegen'
 import { baseParse } from '../src/parse'
 import { transform } from '../src/transform'
+import { transformElement } from '../src/transforms/transformElement'
 import { transformExpression } from '../src/transforms/transformExpression'
 
 describe('codegen 实现 render', () => {
@@ -17,6 +18,16 @@ describe('codegen 实现 render', () => {
     const ast = baseParse('{{mashy}}')
     transform(ast, {
       nodeTransforms: [transformExpression]
+    })
+    const { code } = generate(ast)
+
+    expect(code).toMatchSnapshot()
+  })
+
+  it('element 标签', () => {
+    const ast = baseParse('<div>hi~{{ mashy }}</div>')
+    transform(ast, {
+      nodeTransforms: [transformElement]
     })
     const { code } = generate(ast)
 
