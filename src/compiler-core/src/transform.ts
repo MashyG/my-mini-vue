@@ -23,7 +23,12 @@ export function transform(root: any, options: NodeTransforms | any = {}) {
 }
 
 function createRootCodegen(root: any) {
-  root.codegenNode = root.children[0]
+  const child = root.children[0]
+  if (child.type === NodeTypes.ELEMENT) {
+    root.codegenNode = child.codegenNode
+  } else {
+    root.codegenNode = child
+  }
 }
 
 function createTransformContext(
@@ -42,10 +47,14 @@ function createTransformContext(
 }
 
 function traverseNode(node: any, context: TransformContext) {
+  const exitFns: any = []
   const { nodeTransforms } = context || {}
   for (let i = 0; i < nodeTransforms.length; i++) {
     const transformFunc: any = nodeTransforms[i]
-    transformFunc(node, context)
+    const onExit = transformFunc(node, context)
+    if (onExit) {
+      exitFns.push(onExit)
+    }
   }
   // console.log('node', node)
 
@@ -59,6 +68,13 @@ function traverseNode(node: any, context: TransformContext) {
       break
     default:
       break
+  }
+
+  let i = exitFns.length
+  // i-- 这个很巧妙
+  // 使用 while 是要比 for 快 (可以使用 https://jsbench.me/ 来测试一下)
+  while (i--) {
+    exitFns[i]()
   }
 }
 
