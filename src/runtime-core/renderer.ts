@@ -418,7 +418,10 @@ export function createRenderer(options) {
         const { proxy, isMounted, next, vnode } = instance || {}
         if (!isMounted) {
           // subTree -> initialVNode
-          const subTree = (instance.subTree = instance.render.call(proxy))
+          const subTree = (instance.subTree = instance.render.call(
+            proxy,
+            proxy
+          ))
           console.log('setupRenderEffect ----- init subTree  >>>>', subTree)
           // initialVNode -> patch
           // initialVNode -> element 类型 -> mountElement 渲染
@@ -433,7 +436,7 @@ export function createRenderer(options) {
             next.el = vnode.el
             updateComponentPreRender(instance, next)
           }
-          const subTree = instance.render.call(proxy)
+          const subTree = instance.render.call(proxy, proxy)
           const prevSubTree = instance.subTree
           console.log(
             'setupRenderEffect ----- update prevSubTree subTree  >>>>',

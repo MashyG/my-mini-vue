@@ -56,11 +56,16 @@ const renderSlots = (slots, name, props) => {
     }
 };
 
+function toDisplayString(val) {
+    return String(val);
+}
+
 const extend = Object.assign;
 const EMPTY_OBJECT = {};
 const isObject = (val) => {
     return val !== null && typeof val === 'object';
 };
+const isString = (val) => typeof val === 'string';
 const hasChanged = (oldVal, newVal) => {
     return !Object.is(oldVal, newVal);
 };
@@ -414,11 +419,14 @@ function handleSetupResult(instance, setupResult) {
     finishComponentSetup(instance);
 }
 function finishComponentSetup(instance) {
-    const { type: component } = instance || {};
-    const { render } = component || {};
-    if (render) {
-        instance.render = render;
+    const Component = instance.type;
+    if (complier && !Component.render) {
+        if (Component.template) {
+            const template = Component.template;
+            Component.render = complier(template);
+        }
     }
+    instance.render = Component.render;
 }
 let currentInstance = null;
 const setCurrentInstance = (instance) => {
@@ -427,6 +435,10 @@ const setCurrentInstance = (instance) => {
 const getCurrentInstance = () => {
     return currentInstance;
 };
+let complier;
+function registerRuntimeCompiler(_complier) {
+    complier = _complier;
+}
 
 // 存值
 const provide = (key, value) => {
@@ -881,7 +893,7 @@ function createRenderer(options) {
             const { proxy, isMounted, next, vnode } = instance || {};
             if (!isMounted) {
                 // subTree -> initialVNode
-                const subTree = (instance.subTree = instance.render.call(proxy));
+                const subTree = (instance.subTree = instance.render.call(proxy, proxy));
                 console.log('setupRenderEffect ----- init subTree  >>>>', subTree);
                 // initialVNode -> patch
                 // initialVNode -> element 类型 -> mountElement 渲染
@@ -896,7 +908,7 @@ function createRenderer(options) {
                     next.el = vnode.el;
                     updateComponentPreRender(instance, next);
                 }
-                const subTree = instance.render.call(proxy);
+                const subTree = instance.render.call(proxy, proxy);
                 const prevSubTree = instance.subTree;
                 console.log('setupRenderEffect ----- update prevSubTree subTree  >>>>', prevSubTree, subTree);
                 instance.subTree = subTree;
@@ -1013,4 +1025,498 @@ function createApp(...args) {
     return renderer.createApp(...args);
 }
 
-export { createApp, createRenderer, createTextVNode, getCurrentInstance, h, inject, nextTick, provide, proxyRefs, ref, renderSlots };
+var runtimeDom = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    createApp: createApp,
+    createElementVNode: createVNode,
+    createRenderer: createRenderer,
+    createTextVNode: createTextVNode,
+    getCurrentInstance: getCurrentInstance,
+    h: h,
+    inject: inject,
+    nextTick: nextTick,
+    provide: provide,
+    proxyRefs: proxyRefs,
+    ref: ref,
+    registerRuntimeCompiler: registerRuntimeCompiler,
+    renderSlots: renderSlots,
+    toDisplayString: toDisplayString
+});
+
+const TO_DISPLAY_STRING = Symbol('toDisplayString');
+const CREATE_ELEMENT_VNODE = Symbol('createElementVNode');
+const helperMapName = {
+    [TO_DISPLAY_STRING]: 'toDisplayString',
+    [CREATE_ELEMENT_VNODE]: 'createElementVNode'
+};
+
+var NodeTypes;
+(function (NodeTypes) {
+    NodeTypes[NodeTypes["INTERPOLATION"] = 0] = "INTERPOLATION";
+    NodeTypes[NodeTypes["SIMPLE_EXPRESSION"] = 1] = "SIMPLE_EXPRESSION";
+    NodeTypes[NodeTypes["ELEMENT"] = 2] = "ELEMENT";
+    NodeTypes[NodeTypes["TEXT"] = 3] = "TEXT";
+    NodeTypes[NodeTypes["ROOT"] = 4] = "ROOT";
+    NodeTypes[NodeTypes["COMPOUND_EXPRESSION"] = 5] = "COMPOUND_EXPRESSION";
+})(NodeTypes || (NodeTypes = {}));
+function createVNodeCall(context, tag, props, children) {
+    if (context) {
+        context.helper(CREATE_ELEMENT_VNODE);
+    }
+    return {
+        // TODO vue3 里面这里的 type 是 VNODE_CALL
+        // 是为了 block 而 mini-vue 里面没有实现 block
+        // 所以创建的是 Element 类型就够用了
+        type: NodeTypes.ELEMENT,
+        tag,
+        props,
+        children
+    };
+}
+
+function generate(ast) {
+    // console.log('ast === ', ast)
+    const context = createCodegenContext();
+    const { push } = context || {};
+    genFunctionPreamble(ast, context);
+    push('return ');
+    const functionName = 'render';
+    const args = ['_ctx', '_cache'];
+    const signature = args.join(', ');
+    push(`function ${functionName}(${signature}) {\n`);
+    push(`return `);
+    genNode(ast.codegenNode, context);
+    push(`\n`);
+    push(`}`);
+    // console.log('context.code ---->>>>> ', context.code)
+    return {
+        code: context.code
+    };
+}
+function createCodegenContext() {
+    const context = {
+        code: '',
+        push(source) {
+            context.code += source;
+        },
+        helper(key) {
+            return `_${helperMapName[key]}`;
+        }
+    };
+    return context;
+}
+function genFunctionPreamble(ast, context) {
+    const { helpers } = ast || {};
+    const { length } = helpers || [];
+    if (length > 0) {
+        const VueBinging = 'Vue';
+        const aliasHelper = (s) => `${helperMapName[s]}: _${helperMapName[s]}`;
+        context.push(`const { ${helpers.map(aliasHelper).join(', ')} } = ${VueBinging}\n`);
+    }
+}
+function genNode(node, context) {
+    // console.log('genNode === ', node)
+    switch (node.type) {
+        case NodeTypes.TEXT:
+            genText(node, context);
+            break;
+        case NodeTypes.INTERPOLATION:
+            genInterpolation(node, context);
+            break;
+        case NodeTypes.SIMPLE_EXPRESSION:
+            genExpression(node, context);
+            break;
+        case NodeTypes.ELEMENT:
+            genElement(node, context);
+            break;
+        case NodeTypes.COMPOUND_EXPRESSION:
+            genCompoundExpression(node, context);
+            break;
+    }
+}
+// 纯字符串
+function genText(node, context) {
+    context.push(`'${node.content}'`);
+}
+// 插值
+function genInterpolation(node, context) {
+    const { push, helper } = context || {};
+    push(`${helper(TO_DISPLAY_STRING)}(`);
+    genNode(node.content, context);
+    push(`)`);
+}
+// 表达式
+function genExpression(node, context) {
+    context.push(`${node.content}`);
+}
+// 标签
+function genElement(node, context) {
+    const { push, helper } = context || {};
+    const { tag, props, children } = node || {};
+    console.log('genElement -- node', node);
+    push(`${helper(CREATE_ELEMENT_VNODE)}(`);
+    genNodeList(genNullableArgs([tag, props, children]), context);
+    push(')');
+}
+function genNullableArgs(args) {
+    // 把末尾为null 的都删除掉
+    // vue3源码中，后面可能会包含 patchFlag、dynamicProps 等编译优化的信息
+    // 而这些信息有可能是不存在的，所以在这边的时候需要删除掉
+    let i = args.length;
+    // 这里 i-- 用的还是特别的巧妙的
+    // 当为0 的时候自然就退出循环了
+    while (i--) {
+        if (args[i] != null)
+            break;
+    }
+    // 把为 falsy 的值都替换成 "null"
+    return args.slice(0, i + 1).map((arg) => arg || 'null');
+}
+function genNodeList(nodes, context) {
+    const { push } = context || {};
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (isString(node)) {
+            push(node);
+        }
+        else {
+            genNode(node, context);
+        }
+        // node 和 node 之间需要加上 逗号(,)
+        // 但是最后一个不需要 "div", [props], [children]
+        if (i < node.length - 1) {
+            push(', ');
+        }
+    }
+}
+// 复合类型：hi~{{data}}
+function genCompoundExpression(node, context) {
+    console.log('genCompoundExpression', node);
+    const { push } = context || {};
+    const children = node.children;
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (isString(child)) {
+            push(child);
+        }
+        else {
+            genNode(child, context);
+        }
+    }
+}
+
+var TagTypes;
+(function (TagTypes) {
+    TagTypes[TagTypes["START"] = 0] = "START";
+    TagTypes[TagTypes["END"] = 1] = "END";
+})(TagTypes || (TagTypes = {}));
+function startsWith(source, searchString) {
+    return source.startsWith(searchString);
+}
+function baseParse(content) {
+    const context = createParseContext(content);
+    return createRoot(parseChildren(context, []));
+}
+// 根据有限状态机的原理，实现 Parse 流程
+function parseChildren(context, ancestor) {
+    const nodes = [];
+    while (!isEnd(context, ancestor)) {
+        let node;
+        const s = context.source || '';
+        if (startsWith(s, '{{')) {
+            // 插值
+            node = parseInterpolation(context);
+        }
+        else if (s[0] === '<') {
+            // element
+            if (s[1] === '/') {
+                // 这里属于 edge case 可以不用关心
+                // 处理结束标签
+                if (/[a-z]/i.test(s[2])) {
+                    // 匹配 </div>
+                    // 需要改变 context.source 的值 -> 也就是需要移动光标
+                    parseTag(context, TagTypes.END);
+                    // 结束标签就以为这都已经处理完了，所以就可以跳出本次循环了
+                    continue;
+                }
+            }
+            else if (/[a-z]/.test(s[1])) {
+                node = parseElement(context, ancestor);
+            }
+        }
+        // text 作为默认解析
+        if (!node) {
+            node = parseText(context);
+        }
+        nodes.push(node);
+    }
+    return nodes;
+}
+// 判断是否结束
+function isEnd(context, ancestor) {
+    const s = context.source;
+    // console.log('isEnd --- source', s)
+    // console.log('isEnd --- ancestor', ancestor)
+    // 遇到结束标签时，例如：</div>
+    if (startsWith(s, '</')) {
+        for (let i = ancestor.length - 1; i >= 0; --i) {
+            if (startsWithEndTagOpen(s, ancestor[i].tag)) {
+                return true;
+            }
+        }
+    }
+    // source 没有值时
+    return !s;
+}
+// 解析插值表达式
+function parseInterpolation(context) {
+    // {{message}} -> message
+    const openDelimiter = '{{';
+    const openDelimiterLength = openDelimiter.length;
+    const closeDelimiter = '}}';
+    const closeDelimiterLength = closeDelimiter.length;
+    const closeIndex = context.source.indexOf(closeDelimiter, openDelimiterLength);
+    // console.log('closeIndex', closeIndex)
+    advanceBy(context, openDelimiterLength);
+    // console.log('context.source', context.source)
+    const rawContentLength = closeIndex - openDelimiterLength;
+    const rawContent = parseTextData(context, rawContentLength);
+    const content = rawContent.trim();
+    // console.log('content', content)
+    advanceBy(context, closeDelimiterLength);
+    // console.log('context.source', context.source)
+    return {
+        type: NodeTypes.INTERPOLATION,
+        content: {
+            type: NodeTypes.SIMPLE_EXPRESSION,
+            content
+        }
+    };
+}
+// 解析 Element
+function parseElement(context, ancestor) {
+    // 1. 解析 Tag
+    const element = parseTag(context, TagTypes.START) || {};
+    // 收集已解析到的 element 标签
+    ancestor.push(element);
+    element.children = parseChildren(context, ancestor);
+    // 移除对应的 element 标签
+    ancestor.pop();
+    console.log('element ---- ', element);
+    if (startsWithEndTagOpen(context.source, element.tag)) {
+        parseTag(context, TagTypes.END);
+    }
+    else {
+        throw new Error(`缺少结束标签：${element.tag}`);
+    }
+    return element;
+}
+function parseTag(context, type) {
+    // 1. 解析 Tag
+    const match = /^<\/?([a-z]*)/i.exec(context.source);
+    console.log('match', match);
+    const tag = match[1];
+    console.log('tag', tag);
+    // 2. 删除处理完的代码
+    advanceBy(context, match[0].length);
+    advanceBy(context, 1);
+    console.log('context', context);
+    if (type === TagTypes.END) {
+        return;
+    }
+    return {
+        type: NodeTypes.ELEMENT,
+        tag
+    };
+}
+// 默认解析 Text
+function parseText(context) {
+    let endIndex = context.source.length;
+    const endTokens = ['<', '{{'];
+    for (let i = 0; i < endTokens.length; i++) {
+        const index = context.source.indexOf(endTokens[i]);
+        if (index !== -1 && endIndex > index) {
+            endIndex = index;
+        }
+    }
+    const content = parseTextData(context, endIndex);
+    console.log('parseText --- context.source', context.source);
+    return { type: NodeTypes.TEXT, content };
+}
+function parseTextData(context, length) {
+    const rawText = context.source.slice(0, length);
+    advanceBy(context, length);
+    return rawText;
+}
+function startsWithEndTagOpen(source, tag) {
+    return (startsWith(source, '</') &&
+        source.slice(2, 2 + tag.length).toLocaleLowerCase() ===
+            tag.toLocaleLowerCase());
+}
+function advanceBy(context, length) {
+    context.source = context.source.slice(length);
+}
+function createRoot(children) {
+    return {
+        type: NodeTypes.ROOT,
+        children
+    };
+}
+function createParseContext(content) {
+    return {
+        source: content
+    };
+}
+
+function transform(root, options = {}) {
+    const context = createTransformContext(root, options);
+    // 1. 深度优先遍历
+    traverseNode(root, context);
+    // root.codegenNode
+    createRootCodegen(root);
+    root.helpers = [...context.helpers.keys()];
+}
+function createRootCodegen(root) {
+    const child = root.children[0];
+    if (child.type === NodeTypes.ELEMENT) {
+        root.codegenNode = child.codegenNode;
+    }
+    else {
+        root.codegenNode = child;
+    }
+}
+function createTransformContext(root, options) {
+    const context = {
+        root,
+        nodeTransforms: options.nodeTransforms || [],
+        helpers: new Map(),
+        helper(key) {
+            context.helpers.set(key, 1);
+        }
+    };
+    return context;
+}
+function traverseNode(node, context) {
+    const exitFns = [];
+    const { nodeTransforms } = context || {};
+    for (let i = 0; i < nodeTransforms.length; i++) {
+        const transformFunc = nodeTransforms[i];
+        const onExit = transformFunc(node, context);
+        if (onExit) {
+            exitFns.push(onExit);
+        }
+    }
+    // console.log('node', node)
+    switch (node.type) {
+        case NodeTypes.INTERPOLATION:
+            context.helper(TO_DISPLAY_STRING);
+            break;
+        case NodeTypes.ROOT:
+        case NodeTypes.ELEMENT:
+            traverseChildren(node.children, context);
+            break;
+    }
+    let i = exitFns.length;
+    // i-- 这个很巧妙
+    // 使用 while 是要比 for 快 (可以使用 https://jsbench.me/ 来测试一下)
+    while (i--) {
+        exitFns[i]();
+    }
+}
+function traverseChildren(children, context) {
+    if (children) {
+        for (let j = 0; j < children.length; j++) {
+            const childNode = children[j];
+            traverseNode(childNode, context);
+        }
+    }
+}
+
+function transformElement(node, context) {
+    if (node.type === NodeTypes.ELEMENT) {
+        return () => {
+            // TODO
+            // 需要把之前的 props 和 children 等一系列的数据都处理
+            const vnodeTag = `'${node.tag}'`;
+            // TODO props 暂时不支持
+            const vnodeProps = null;
+            let vnodeChildren = null;
+            if (node.children.length > 0) {
+                if (node.children.length === 1) {
+                    // 只有一个孩子节点 ，那么当生成 render 函数的时候就不用 [] 包裹
+                    const child = node.children[0];
+                    vnodeChildren = child;
+                }
+            }
+            // 创建一个新的 node 用于 codegen 的时候使用
+            node.codegenNode = createVNodeCall(context, vnodeTag, vnodeProps, vnodeChildren);
+        };
+    }
+}
+
+function transformExpression(node) {
+    if (node.type === NodeTypes.INTERPOLATION) {
+        node.content = processExpression(node.content);
+    }
+}
+function processExpression(node) {
+    node.content = `_ctx.${node.content}`;
+    return node;
+}
+
+function isText(node) {
+    const { type } = node || {};
+    return type === NodeTypes.TEXT || type === NodeTypes.INTERPOLATION;
+}
+
+function transformText(node) {
+    if (node.type === NodeTypes.ELEMENT) {
+        return () => {
+            const children = node.children;
+            const { length } = children || [];
+            let currentContainer;
+            for (let i = 0; i < length; i++) {
+                const child = children[i];
+                // 看看下一个节点是不是 text 类
+                if (isText(child)) {
+                    for (let j = i + 1; j < length; j++) {
+                        const nextChild = children[j];
+                        if (isText(nextChild)) {
+                            if (!currentContainer) {
+                                currentContainer = children[i] = {
+                                    type: NodeTypes.COMPOUND_EXPRESSION,
+                                    children: [child]
+                                };
+                            }
+                            currentContainer.children.push(' + ', nextChild);
+                            children.splice(j, 1);
+                            j--;
+                        }
+                        else {
+                            currentContainer = undefined;
+                            break;
+                        }
+                    }
+                }
+            }
+        };
+    }
+}
+
+function baseCompile(template) {
+    const ast = baseParse(template);
+    transform(ast, {
+        nodeTransforms: [transformExpression, transformElement, transformText]
+    });
+    return generate(ast);
+}
+
+// mini-vue 出口
+function complier2Function(template) {
+    const { code } = baseCompile(template);
+    const render = new Function('Vue', code)(runtimeDom);
+    return render;
+}
+registerRuntimeCompiler(complier2Function);
+
+export { createApp, createVNode as createElementVNode, createRenderer, createTextVNode, getCurrentInstance, h, inject, nextTick, provide, proxyRefs, ref, registerRuntimeCompiler, renderSlots, toDisplayString };
