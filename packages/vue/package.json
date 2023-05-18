@@ -1,0 +1,18 @@
+{
+  "name": "@mashy-mini-vue/vue",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mini-vue/vue"
+  ],
+  "author": "MashyG",
+  "license": "ISC",
+  "dependencies": {
+    "@mashy-mini-vue/runtime-dom": "workspace:^1.0.0",
+    "@mashy-mini-vue/compiler-core": "workspace:^1.0.0"
+  }
+}
