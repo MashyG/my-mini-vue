@@ -1,8 +1,5 @@
 'use strict';
 
-var reactive$1 = require('@mashy-mini-vue/reactivity/reactive');
-var effect = require('@mashy-mini-vue/reactivity/effect');
-
 function toDisplayString(val) {
     return String(val);
 }
@@ -93,9 +90,71 @@ function createDep(effects) {
     return dep;
 }
 
+// 全局变量存储 ReactiveEffect 实例对象，用于调用 fn
+let activeEffect;
+let shouldTack;
+class ReactiveEffect {
+    constructor(fn, scheduler) {
+        this.scheduler = scheduler;
+        this.deps = []; // 所有的依赖 dep
+        this.active = true;
+        this._fn = fn;
+    }
+    run() {
+        if (!this.active) {
+            return this._fn();
+        }
+        shouldTack = true;
+        activeEffect = this; // 暂存实例，触发依赖或暂停相应时调用
+        const result = this._fn();
+        shouldTack = false;
+        return result;
+    }
+    stop() {
+        if (this.active) {
+            cleanupEffect(this);
+            this.onStop && this.onStop();
+            this.active = false;
+        }
+    }
+}
+function cleanupEffect(effect) {
+    effect.deps.forEach((dep) => {
+        dep.delete(effect);
+    });
+    effect.deps.length = 0;
+}
 // 收集依赖
 // target 容器
 const targetMap = new Map();
+function track(target, key) {
+    if (!isTacking())
+        return;
+    // target 容器
+    let depsMap = targetMap.get(target);
+    if (!depsMap) {
+        depsMap = new Map();
+        targetMap.set(target, depsMap);
+    }
+    // key 容器
+    let dep = depsMap.get(key);
+    if (!dep) {
+        dep = createDep();
+        depsMap.set(key, dep);
+    }
+    trackEffects(dep);
+}
+function trackEffects(dep) {
+    // 看看 dep 之前有没有添加过，若有，则不添加了
+    if (!dep.has(activeEffect)) {
+        dep.add(activeEffect);
+        // activeEffect.deps 用于之后清除 dep 工作，所以暂存一下
+        activeEffect.deps.push(dep);
+    }
+}
+function isTacking() {
+    return shouldTack && activeEffect !== undefined;
+}
 // 触发依赖
 function trigger(target, key) {
     const depsMap = targetMap.get(target);
@@ -114,6 +173,18 @@ function triggerEffects(dep) {
         }
     }
 }
+function effect(fn, options) {
+    const { scheduler } = options || {};
+    // 调用 fn
+    const _effect = new ReactiveEffect(fn, scheduler);
+    extend(_effect, options);
+    _effect.run();
+    // 内部存在 this，所以需要绑定当前实例 _effect
+    const runner = _effect.run.bind(_effect);
+    // 将实例对象暂存起来，便于后续使用 effect
+    runner.effect = _effect;
+    return runner;
+}
 
 const createGetter = (isReadonly = false, shallow = false) => {
     return function get(target, key) {
@@ -130,6 +201,10 @@ const createGetter = (isReadonly = false, shallow = false) => {
         // 嵌套对象处理：判断 res 是否 Object
         if (isObject(res)) {
             return isReadonly ? readonly(res) : reactive(res);
+        }
+        if (!isReadonly) {
+            // 收集依赖
+            track(target, key);
         }
         return res;
     };
@@ -158,7 +233,7 @@ const readonlyHandlers = {
         return true;
     }
 };
-extend({}, readonlyHandlers, {
+const shallowReadonlyHandlers = extend({}, readonlyHandlers, {
     get: shallowReadonlyGet
 });
 
@@ -180,6 +255,9 @@ function reactive(raw) {
 function readonly(raw) {
     return createReactiveObject(raw, readonlyHandlers);
 }
+function shallowReadonly(raw) {
+    return createReactiveObject(raw, shallowReadonlyHandlers);
+}
 
 class RefImpl {
     constructor(value) {
@@ -190,6 +268,7 @@ class RefImpl {
         this.dep = createDep();
     }
     get value() {
+        trackRefValue(this);
         return this._value;
     }
     set value(newVal) {
@@ -207,6 +286,11 @@ function convert(value) {
 }
 function triggerRefValue(ref) {
     triggerEffects(ref.dep);
+}
+function trackRefValue(ref) {
+    if (isTacking()) {
+        trackEffects(ref.dep);
+    }
 }
 function ref(value) {
     return new RefImpl(value);
@@ -290,7 +374,7 @@ function createComponentInstance(vnode, parent) {
     var _a;
     const instance = {
         vnode,
-        type: (_a = vnode === null || vnode === void 0 ? void 0 : vnode.type) !== null && _a !== void 0 ? _a : '',
+        type: (_a = vnode === null || vnode === void 0 ? void 0 : vnode.type) !== null && _a !== void 0 ? _a : "",
         setupState: {},
         props: {},
         slots: {},
@@ -300,7 +384,7 @@ function createComponentInstance(vnode, parent) {
         parent,
         isMounted: false,
         subTree: {},
-        emit: () => { }
+        emit: () => { },
     };
     instance.emit = emit.bind(null, instance);
     return instance;
@@ -313,7 +397,7 @@ function setupComponent(instance) {
     setupStatefulComponent(instance);
 }
 function setupStatefulComponent(instance) {
-    console.log('setupStatefulComponent ----- instance  >>>>', instance);
+    console.log("setupStatefulComponent ----- instance  >>>>", instance);
     // 初始化 ctx
     instance.proxy = new Proxy({ _: instance }, publicInstanceProxyHandlers);
     const { type: component, props, emit } = instance || {};
@@ -321,17 +405,17 @@ function setupStatefulComponent(instance) {
     if (setup) {
         setCurrentInstance(instance);
         // setupResult => function or object
-        const setupResult = setup(reactive$1.shallowReadonly(props), {
-            emit
+        const setupResult = setup(shallowReadonly(props), {
+            emit,
         });
         setCurrentInstance(null);
         handleSetupResult(instance, setupResult);
     }
 }
 function handleSetupResult(instance, setupResult) {
-    console.log('handleSetupResult ----- instance  >>>>', instance);
+    console.log("handleSetupResult ----- instance  >>>>", instance);
     // TODO function 处理
-    if (typeof setupResult === 'object') {
+    if (typeof setupResult === "object") {
         instance.setupState = proxyRefs(setupResult);
     }
     finishComponentSetup(instance);
@@ -443,15 +527,15 @@ function shouldUpdateComponent(prevVNode, nextVNode) {
 }
 
 function createRenderer(options) {
-    const { createElement: hostCreateElement, patchProps: hostPatchProps, insert: hostInsert, remove: hostRemove, setElementText: hostSetElementText } = options || {};
+    const { createElement: hostCreateElement, patchProps: hostPatchProps, insert: hostInsert, remove: hostRemove, setElementText: hostSetElementText, } = options || {};
     function render(vnode, rootContainer) {
         // patch
         patch(null, vnode, rootContainer, null, null);
     }
     // n1 旧节点；n2 新节点
     function patch(n1, n2, container, parentComponent, anchor) {
-        console.log('patch ----- n1, n2  >>>>', n1, n2);
-        const { type = '', shapeFlags } = n2 || {};
+        console.log("patch ----- n1, n2  >>>>", n1, n2);
+        const { type = "", shapeFlags } = n2 || {};
         switch (type) {
             case Fragment:
                 processFragment(n1, n2, container, parentComponent, anchor);
@@ -490,7 +574,7 @@ function createRenderer(options) {
     }
     // 初始化 Element
     function mountElement(vnode, container, parentComponent, anchor) {
-        console.log('processElement ----- vnode  >>>>', vnode);
+        console.log("processElement ----- vnode  >>>>", vnode);
         const { type, children, props, shapeFlags } = vnode || {};
         // createElement
         const el = (vnode.el = hostCreateElement(type));
@@ -505,7 +589,7 @@ function createRenderer(options) {
         for (const key in props) {
             const val = props[key];
             // patchProps
-            console.log('patchProps ========= val ----', props, val);
+            console.log("patchProps ========= val ----", props, val);
             hostPatchProps(el, key, null, val);
         }
         // insert
@@ -518,7 +602,7 @@ function createRenderer(options) {
     }
     // 更新 Element
     function patchElement(n1, n2, container, parentComponent, anchor) {
-        console.log('patchElement ==== n1, n2 >>>>>', n1, n2);
+        console.log("patchElement ==== n1, n2 >>>>>", n1, n2);
         const oldProps = n1.props || EMPTY_OBJECT;
         const newProps = n2.props || EMPTY_OBJECT;
         const el = (n2.el = n1.el);
@@ -568,7 +652,7 @@ function createRenderer(options) {
             if (prevShapeFlags & ShapeFlags.TEXT_CHILDREN) {
                 // 旧节点为 Text
                 // 1. 移除旧节点
-                hostSetElementText(container, '');
+                hostSetElementText(container, "");
                 // 2. 插入新节点；
                 mountChildren(nextChildren, container, parentComponent, anchor);
             }
@@ -766,7 +850,7 @@ function createRenderer(options) {
     }
     // 处理组件类型
     function processComponent(n1, n2, container, parentComponent, anchor) {
-        console.log('processComponent ----- n2  >>>>', n2);
+        console.log("processComponent ----- n2  >>>>", n2);
         if (!n1) {
             mountComponent(n2, container, parentComponent, anchor);
         }
@@ -778,15 +862,15 @@ function createRenderer(options) {
     function mountComponent(initialVNode, container, parentComponent, anchor) {
         // 存储 component，供后续更新组件使用
         const instance = (initialVNode.component = createComponentInstance(initialVNode, parentComponent));
-        console.log('mountComponent ----- instance 111 >>>>', instance);
+        console.log("mountComponent ----- instance 111 >>>>", instance);
         setupComponent(instance);
-        console.log('mountComponent ----- instance 222 >>>>', instance);
+        console.log("mountComponent ----- instance 222 >>>>", instance);
         setupRenderEffect(instance, initialVNode, container, anchor);
     }
     // 更新组件
     function updateComponent(n1, n2) {
         const instance = (n2.component = n1.component);
-        console.log('updateComponent ----- instance >>>>', instance);
+        console.log("updateComponent ----- instance >>>>", instance);
         // 判断是否需要更新组件
         if (shouldUpdateComponent(n1, n2)) {
             // 暂存下次需要更新的 vnode
@@ -807,12 +891,12 @@ function createRenderer(options) {
     // 调用 render，进行拆箱操作
     function setupRenderEffect(instance, initialVNode, container, anchor) {
         // effect 返回的 runner 供后续更新组件使用
-        instance.update = effect.effect(() => {
+        instance.update = effect(() => {
             const { proxy, isMounted, next, vnode } = instance || {};
             if (!isMounted) {
                 // subTree -> initialVNode
                 const subTree = (instance.subTree = instance.render.call(proxy, proxy));
-                console.log('setupRenderEffect ----- init subTree  >>>>', subTree);
+                console.log("setupRenderEffect ----- init subTree  >>>>", subTree);
                 // initialVNode -> patch
                 // initialVNode -> element 类型 -> mountElement 渲染
                 patch(null, subTree, container, instance, anchor);
@@ -828,20 +912,20 @@ function createRenderer(options) {
                 }
                 const subTree = instance.render.call(proxy, proxy);
                 const prevSubTree = instance.subTree;
-                console.log('setupRenderEffect ----- update prevSubTree subTree  >>>>', prevSubTree, subTree);
+                console.log("setupRenderEffect ----- update prevSubTree subTree  >>>>", prevSubTree, subTree);
                 instance.subTree = subTree;
                 patch(prevSubTree, subTree, container, instance, anchor);
             }
         }, {
             scheduler() {
-                console.log('update -  scheduler');
+                console.log("update -  scheduler");
                 // 通过微任务控制组件的更新
                 queueJobs(instance.update);
-            }
+            },
         });
     }
     return {
-        createApp: createAppApi(render)
+        createApp: createAppApi(render),
     };
 }
 function updateComponentPreRender(instance, nextVNode) {
@@ -949,6 +1033,7 @@ var runtimeDom = /*#__PURE__*/Object.freeze({
     createElementVNode: createVNode,
     createRenderer: createRenderer,
     createTextVNode: createTextVNode,
+    effect: effect,
     getCurrentInstance: getCurrentInstance,
     h: h,
     inject: inject,
@@ -958,6 +1043,7 @@ var runtimeDom = /*#__PURE__*/Object.freeze({
     ref: ref,
     registerRuntimeCompiler: registerRuntimeCompiler,
     renderSlots: renderSlots,
+    shallowReadonly: shallowReadonly,
     toDisplayString: toDisplayString
 });
 
@@ -1441,6 +1527,7 @@ exports.createApp = createApp;
 exports.createElementVNode = createVNode;
 exports.createRenderer = createRenderer;
 exports.createTextVNode = createTextVNode;
+exports.effect = effect;
 exports.getCurrentInstance = getCurrentInstance;
 exports.h = h;
 exports.inject = inject;
@@ -1450,4 +1537,5 @@ exports.proxyRefs = proxyRefs;
 exports.ref = ref;
 exports.registerRuntimeCompiler = registerRuntimeCompiler;
 exports.renderSlots = renderSlots;
+exports.shallowReadonly = shallowReadonly;
 exports.toDisplayString = toDisplayString;

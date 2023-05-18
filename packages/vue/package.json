@@ -13,6 +13,6 @@
   "license": "ISC",
   "dependencies": {
     "@mashy-mini-vue/runtime-dom": "workspace:^1.0.0",
-    "@mashy-mini-vue/compiler-core": "workspace:^1.0.0"
+    "@mashy-mini-vue/complier-core": "workspace:^1.0.0"
   }
 }
