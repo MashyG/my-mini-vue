@@ -1,6 +1,6 @@
 # my-mini-vue
 
-## Learn Vue3 Source Code
+## Learn mini-vue Source Code
 
 [record](./INDEX.md)
 
