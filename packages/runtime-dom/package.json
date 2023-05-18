@@ -1,0 +1,17 @@
+{
+  "name": "@mashy-mini-vue/runtime-dom",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mini-vue/runtime-dom"
+  ],
+  "author": "MashyG",
+  "license": "ISC",
+  "dependencies": {
+    "@mashy-mini-vue/runtime-core": "workspace:^1.0.0"
+  }
+}
