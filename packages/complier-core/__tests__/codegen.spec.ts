@@ -28,7 +28,7 @@ describe('codegen 实现 render', () => {
   it('element 标签', () => {
     const ast = baseParse('<div>hi~{{ mashy }}</div>')
     transform(ast, {
-      nodeTransforms: [transformExpression, transformElement, transformText]
+      nodeTransforms: [transformElement, transformText, transformExpression]
     })
     const { code } = generate(ast)
 

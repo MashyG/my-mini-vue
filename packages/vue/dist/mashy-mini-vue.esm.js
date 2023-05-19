@@ -1506,10 +1506,13 @@ function transformText(node) {
 }
 
 function baseCompile(template) {
+    // 1. 先把 template 也就是字符串 parse 成 ast
     const ast = baseParse(template);
+    // 2. 转化 ast
     transform(ast, {
         nodeTransforms: [transformExpression, transformElement, transformText]
     });
+    // 3. 生成 render 函数代码
     return generate(ast);
 }
 
